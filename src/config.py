@@ -8,7 +8,9 @@ class Config(object):
         self.base_dir = '/media/data_cifs/lakshmi/projectABC/'
 
         # Data configuration
-        self.param_dims = [None,1,4]
+        # Let's say we go with NxHxWxC configuration as of now
+        self.param_dims = [None, 1, 4, 1]
+        self.output_hist_dims = [None, 1, 500, 2]
 
         self.results_dir = '/media/data_cifs/lakshmi/zebrafish/results/'
         self.model_output = ''

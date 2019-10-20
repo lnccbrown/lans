@@ -157,24 +157,11 @@ def calc_error(labels,predictions):
     return tf.reduce_mean(tf.sqrt(tf.reduce_sum(tf.square(labels-predictions), 1)),0)
 
 def train_model(config):
-    '''
-    train_data = os.path.join(config.tfrecord_dir, config.train_tfrecords)
-    val_data = os.path.join(config.tfrecord_dir, config.val_tfrecords)
 
     with tf.device('/cpu:0'):
-        train_images, train_labels = inputs(tfrecord_file=train_data,
-                                            num_epochs=config.epochs,
-                                            image_target_size=config.image_target_size,
-                                            label_shape=config.label_shape,
-                                            batch_size=config.train_batch,
-                                            augmentation=True)
+        train_data = tf.placeholder(tf.float32, config.param_dims)
+        train_labels = tf.placeholder(tf.float32, config.output_hist_dims) 
 
-        val_images, val_labels = inputs(tfrecord_file=val_data,
-                                        num_epochs=config.epochs,
-                                        image_target_size=config.image_target_size,
-                                        label_shape=config.label_shape,
-                                        batch_size=config.val_batch)
-    '''
     import ipdb; ipdb.set_trace()
     with tf.device('/gpu:0'):
         with tf.variable_scope("model") as scope:
