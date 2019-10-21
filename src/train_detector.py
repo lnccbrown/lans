@@ -10,6 +10,7 @@ import tensorflow as tf
 import config
 from tf_data_handler import inputs
 import os
+import numpy as np
 
 class cnn_model_struct:
     def __init__(self, trainable=False):
@@ -21,111 +22,55 @@ class cnn_model_struct:
         return getattr(self,item)
 
     def __contains__(self, item):
-        return hasattr(self,item)
+        return hasattr(self, item)
 
-    def build(self, patch, output_shape,train_mode=None):
+    def get_size(self, input_data):
+        return np.prod([int(x) for x in input_data.get_shape()[1:]])
 
-        print ("building the network")
-        input_patch = tf.identity(patch,name="input_patch")
+    def build(self, input_data, input_shape, output_shape, train_mode=None):
+        print ("Building the network...")
+        network_input = tf.identity(input_data, name='input')
         with tf.name_scope('reshape'):
-            x_image = tf.reshape(input_patch, [-1, 416, 416, 1]) # 3 for rgb, 1 for Y
+            x_data = tf.reshape(network_input, [-1, input_shape[0], input_shape[1], input_shape[2]])
+        self.upsample1 = self.fc_layer(x_data, self.get_size(x_data), 16, 'upsample1')
+        print(self.upsample1.get_shape())
+        self.upsample2 = self.fc_layer(self.upsample1, self.get_size(self.upsample1), 64, 'upsample2')
+        print(self.upsample2.get_shape())
+        self.upsample3 = self.fc_layer(self.upsample2, self.get_size(self.upsample2), 256, 'upsample3')
+        print(self.upsample3.get_shape())
+        self.upsample4 = self.fc_layer(self.upsample3, self.get_size(self.upsample3), 1024, 'upsample4')
+        print(self.upsample4.get_shape())
+
+        self.upsample4 = tf.expand_dims(tf.expand_dims(self.upsample4,1),-1)
 
         # conv layer 1
         with tf.name_scope('conv1'):
-            self.W_conv1 = self.weight_variable([3, 3, 1, 8],var_name='wconv1')
+            self.W_conv1 = self.weight_variable([1, 5, 1, 8],var_name='wconv1')
             self.b_conv1 = self.bias_variable([8],var_name='bconv1')
-            #if train_mode:
-            self.norm1 = tf.layers.batch_normalization(self.conv2d(x_image, self.W_conv1,stride=[1,2,2,1]) + self.b_conv1,scale=True,center=True,training=train_mode)
+            self.norm1 = tf.layers.batch_normalization(self.conv2d(self.upsample4, self.W_conv1,stride=[1,2,2,1]) + self.b_conv1,scale=True,center=True,training=train_mode)
             self.h_conv1 = tf.nn.leaky_relu(self.norm1, alpha=0.1)
-            #else:
-            #    self.h_conv1 = tf.nn.leaky_relu(self.conv2d(x_image, self.W_conv1,stride=[1,1,1,1]) + self.b_conv1, alpha=0.1)
+        print(self.h_conv1.get_shape())
 
-        # # Pooling layer - downsamples by 2X.
-        # with tf.name_scope('pool1'):
-        #     self.h_pool1 = self.max_pool_2x2(self.h_conv1)
-
-        # conv layer 2 -- maps 16 feature maps to 32.
+        # conv layer 2
         with tf.name_scope('conv2'):
-            self.W_conv2 = self.weight_variable([3, 3, 8, 16],var_name='wconv2')
-            self.b_conv2 = self.bias_variable([16],var_name='bconv2')
-            #if train_mode:
+            self.W_conv2 = self.weight_variable([1, 5, 8, 4],var_name='wconv2')
+            self.b_conv2 = self.bias_variable([4],var_name='bconv2')
             self.norm2 = tf.layers.batch_normalization(self.conv2d(self.h_conv1, self.W_conv2, stride=[1, 1, 1, 1]) + self.b_conv2,scale=True,center=True,training=train_mode)
             self.h_conv2 = tf.nn.leaky_relu(self.norm2, alpha=0.1)
-            #else:
-            #    self.h_conv2 = tf.nn.leaky_relu(
-            #        self.conv2d(self.h_pool1, self.W_conv2, stride=[1, 1, 1, 1]) + self.b_conv2, alpha=0.1)
+        print(self.h_conv2.get_shape())
 
-        # Second pooling layer.
-        with tf.name_scope('pool2'):
-            self.h_pool2 = self.max_pool_2x2(self.h_conv2)
-
-        # conv layer 3 -- maps 32 feature maps to 64.
+        # conv layer 3
         with tf.name_scope('conv3'):
-            self.W_conv3 = self.weight_variable([3, 3, 16, 32],var_name='wconv3')
-            self.b_conv3 = self.bias_variable([32],var_name='bconv3')
-
-            #if train_mode:
-            self.norm3 = tf.layers.batch_normalization(self.conv2d(self.h_pool2, self.W_conv3, stride=[1, 2, 2, 1]) + self.b_conv3, scale=True,center=True,training=train_mode)
+            self.W_conv3 = self.weight_variable([1, 5, 4, 2],var_name='wconv3')
+            self.b_conv3 = self.bias_variable([2],var_name='bconv3')
+            self.norm3 = tf.layers.batch_normalization(self.conv2d(self.h_conv2, self.W_conv3, stride=[1, 1, 1, 1]) + self.b_conv3, scale=True,center=True,training=train_mode)
             self.h_conv3 = tf.nn.leaky_relu(self.norm3,alpha=0.1)
-            #else:
-            #    self.h_conv3 = tf.nn.leaky_relu(
-            #        self.conv2d(self.h_pool2, self.W_conv3, stride=[1, 1, 1, 1]) + self.b_conv3, alpha=0.1)
-        # Second pooling layer.
-        # with tf.name_scope('pool3'):
-        #     self.h_pool3 = self.max_pool_2x2(self.h_conv3)
+        print(self.h_conv3.get_shape())
 
-        # conv layer 4 -- maps 64 feature maps to 128.
-        with tf.name_scope('conv4'):
-            self.W_conv4 = self.weight_variable([3, 3, 32, 64],var_name='wconv4')
-            self.b_conv4 = self.bias_variable([64],var_name='bconv4')
-            #if train_mode:
-            self.norm4 = tf.layers.batch_normalization(self.conv2d(self.h_conv3, self.W_conv4, stride=[1, 1, 1, 1]) + self.b_conv4, scale=True,center=True,training=train_mode)
-            self.h_conv4 = tf.nn.leaky_relu(self.norm4, alpha=0.1)
-            #else:
-            #    self.h_conv4 = tf.nn.leaky_relu(
-            #        self.conv2d(self.h_pool3, self.W_conv4, stride=[1, 1, 1, 1]) + self.b_conv4, alpha=0.1)
-
-        # Second pooling layer.
-        with tf.name_scope('pool4'):
-            self.h_pool4 = self.max_pool_2x2(self.h_conv4)
-
-        # conv layer 5 -- maps 128 feature maps to 256.
-        with tf.name_scope('conv5'):
-            self.W_conv5 = self.weight_variable([3, 3, 64, 128],var_name='wconv5')
-            self.b_conv5 = self.bias_variable([128],var_name='bconv5')
-            #if train_mode:
-            self.norm5 = tf.layers.batch_normalization(self.conv2d(self.h_pool4, self.W_conv5, stride=[1, 2, 2, 1]) + self.b_conv5, scale=True,center=True,training=train_mode)
-            self.h_conv5 = tf.nn.leaky_relu(self.norm5, alpha=0.1)
-            #else:
-            #    self.h_conv5 = tf.nn.leaky_relu(
-            #        self.conv2d(self.h_pool4, self.W_conv5, stride=[1, 1, 1, 1]) + self.b_conv5, alpha=0.1)
-        # Second pooling layer.
-        # with tf.name_scope('pool5'):
-        #     self.h_pool5 = self.max_pool_2x2(self.h_conv5)
-
-        # conv layer 6 -- maps 32 feature maps to 64.
-        with tf.name_scope('conv6'):
-            self.W_conv6 = self.weight_variable([3, 3, 128, 256],var_name='wconv6')
-            self.b_conv6 = self.bias_variable([256],var_name='bconv6')
-
-            #if train_mode:
-            self.norm6 = tf.layers.batch_normalization(self.conv2d(self.h_conv5, self.W_conv6, stride=[1, 1, 1, 1]) + self.b_conv6, scale=True,center=True,training=train_mode)
-            self.h_conv6 = tf.nn.leaky_relu(self.norm6,alpha=0.1)
-            #else:
-            #    self.h_conv6 = tf.nn.leaky_relu(
-            #        self.conv2d(self.h_pool5, self.W_conv6, stride=[1, 1, 1, 1]) + self.b_conv6, alpha=0.1)
-
-        # Second pooling layer.
-        with tf.name_scope('pool6'):
-            self.h_pool6 = self.max_pool_2x2_1(self.h_conv6)
-
-        # conv layer 9 -- 1x1 conv for the output
-        with tf.name_scope('conv7'):
-            self.W_conv7 = self.weight_variable([1, 1, 256, 3],var_name='wconv7')
-            self.b_conv7 = self.bias_variable([3],var_name='bconv7')
-            self.h_conv7 = self.conv2d(self.h_pool6, self.W_conv7, stride=[1, 1, 1, 1]) + self.b_conv7
-
-        self.output = tf.identity(self.h_conv7,name="output")
+        self.final_layer = self.fc_layer(self.h_conv3, self.get_size(self.h_conv3), 1000, 'final_layer')
+        self.final_layer = tf.nn.softmax(self.final_layer)
+        self.output = tf.identity(self.final_layer,name='output')
+        print(self.output.get_shape())
 
     def conv2d(self, x, W, stride=[1,1,1,1]):
         """conv2d returns a 2d convolution layer with full stride."""
@@ -151,10 +96,56 @@ class cnn_model_struct:
         initial = tf.constant(0.001, shape=shape)
         return tf.get_variable(name=var_name,initializer=initial)
 
+    def fc_layer(self, bottom, in_size, out_size, name):
+        with tf.variable_scope(name):
+            weights, biases = self.get_fc_var(in_size, out_size, name)
+            x = tf.reshape(bottom, [-1, in_size])
+            fc = tf.nn.bias_add(tf.matmul(x, weights), biases)
+            return fc
+
+    def get_fc_var(self, in_size, out_size, name, init_type='xavier'):
+        if init_type == 'xavier':
+            weight_init = [
+                [in_size, out_size],
+                tf.contrib.layers.xavier_initializer(uniform=False)]
+        else:
+            weight_init = tf.truncated_normal(
+                [in_size, out_size], 0.0, 0.001)
+        bias_init = tf.truncated_normal([out_size], .0, .001)
+        weights = self.get_var(weight_init, name, 0, name + "_weights")
+        biases = self.get_var(bias_init, name, 1, name + "_biases")
+
+        return weights, biases
+
+    def get_var(
+            self, initial_value, name, idx,
+            var_name, in_size=None, out_size=None):
+        if self.data_dict is not None and name in self.data_dict:
+            value = self.data_dict[name][idx]
+        else:
+            value = initial_value
+
+        if self.trainable:
+            # get_variable, change the boolean to numpy
+            if type(value) is list:
+                var = tf.get_variable(
+                    name=var_name, shape=value[0], initializer=value[1])
+            else:
+                var = tf.get_variable(name=var_name, initializer=value)
+        else:
+            var = tf.constant(value, dtype=tf.float32, name=var_name)
+
+        self.var_dict[(name, idx)] = var
+
+        return var
+
 def calc_error(labels,predictions):
     # note that here there are only 2 dimensions -- batch index and (u,v,d)
     assert (labels.shape == predictions.shape)
     return tf.reduce_mean(tf.sqrt(tf.reduce_sum(tf.square(labels-predictions), 1)),0)
+
+def kl_divergence(p, q): 
+    return tf.reduce_sum(p * tf.log(p/q))
 
 def train_model(config):
 
@@ -166,13 +157,13 @@ def train_model(config):
     with tf.device('/gpu:0'):
         with tf.variable_scope("model") as scope:
             print ("creating the model")
-            model = cnn_model_struct()
-            model.build(train_images,config.num_classes,train_mode=True)
+            model = cnn_model_struct(trainable=True)
+            model.build(train_data, config.param_dims[1:], config.output_hist_dims[1:],train_mode=True)
             y_conv = model.output
 
             # Define loss and optimizer
             with tf.name_scope('loss'):
-                reg_loss = tf.nn.l2_loss(y_conv - train_labels)
+                kl_divergence_loss = kl_divergence(tf.squeeze(y_conv[:,:,0]), tf.reshape(train_labels,[-1,1000]))
 
             with tf.name_scope('adam_optimizer'):
                 # wd_l = [v for v in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES) if 'biases' not in v.name]
@@ -187,15 +178,17 @@ def train_model(config):
             #     lab_shaped = tf.reshape(train_labels, [config.train_batch, config.num_classes])
             # accuracy = calc_error(lab_shaped, res_shaped)
 
-            print("using validation")
-            # scope.reuse_variables()
+            '''
+            # Use this if we want to run validation online
+            '''
+            '''
+            print("building a validation model")
             with tf.variable_scope('val_model', reuse=tf.AUTO_REUSE):
                 val_model = cnn_model_struct()
                 val_model.build(val_images, config.num_classes, train_mode=False)
                 val_res = val_model.output
-                # val_res_shaped = tf.reshape(val_model.output, [config.val_batch, config.num_classes])
-                # val_lab_shaped = tf.reshape(val_labels, [config.val_batch, config.num_classes])
                 val_error =  tf.reduce_mean(tf.sqrt(tf.reduce_sum(tf.square(val_labels-val_res))))
+            '''
 
             tf.summary.scalar("loss", reg_loss)
             #tf.summary.scalar("train error", accuracy)
