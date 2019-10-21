@@ -163,7 +163,7 @@ def train_model(config):
 
             # Define loss and optimizer
             with tf.name_scope('loss'):
-                kl_divergence_loss = kl_divergence(tf.squeeze(y_conv[:,:,0]), tf.reshape(train_labels,[-1,1000]))
+                kl_divergence_loss = kl_divergence(y_conv, tf.reshape(train_labels,[-1,1000]))
 
             with tf.name_scope('adam_optimizer'):
                 # wd_l = [v for v in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES) if 'biases' not in v.name]
@@ -171,7 +171,7 @@ def train_model(config):
                 # train_step = tf.train.AdamOptimizer(1e-4).minimize(loss_wd)
                 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
                 with tf.control_dependencies(update_ops):
-                    train_step = tf.train.AdamOptimizer(1e-4).minimize(reg_loss)
+                    train_step = tf.train.AdamOptimizer(1e-4).minimize(kl_divergence_loss)
 
             # with tf.name_scope('accuracy'):
             #     res_shaped = tf.reshape(y_conv, [config.train_batch, config.num_classes])
@@ -190,7 +190,7 @@ def train_model(config):
                 val_error =  tf.reduce_mean(tf.sqrt(tf.reduce_sum(tf.square(val_labels-val_res))))
             '''
 
-            tf.summary.scalar("loss", reg_loss)
+            tf.summary.scalar("loss", kl_divergence_loss)
             #tf.summary.scalar("train error", accuracy)
             #tf.summary.scalar("validation error", val_error)
             summary_op = tf.summary.merge_all()
