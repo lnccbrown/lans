@@ -11,26 +11,12 @@ class Config(object):
         # Let's say we go with NxHxWxC configuration as of now
         self.param_dims = [None, 1, 4, 1]
         self.output_hist_dims = [None, 1, 500, 2]
-
-        self.results_dir = '/media/data_cifs/lakshmi/zebrafish/results/'
-        self.model_output = ''
-        self.model_input = ''
-        self.train_summaries = ''
+        self.results_dir = '/media/data_cifs/lakshmi/projectABC/results/'
+        self.model_output = '/media/data_cifs/lakshmi/projectABC/models/cnn-v0'
 
         # Model hyperparameters
         self.epochs = 100
-        #self.image_orig_size = [1080, 1920, 3]
-        #self.image_target_size = [416, 416, 3]
-        #self.image_orig_size = [1080, 1920, 1]
-        self.image_orig_size = [480, 640, 1]
-        self.image_target_size = [416, 416, 1]
-
-        self.label_shape = [13,13,3]
-        self.resize_ims = True
         self.train_batch = 64
         self.val_batch= 8
         self.test_batch = 1
-
-        self.model_output = '/media/data_cifs/lakshmi/zebrafish/darkAndLight_Bootstrapped/'
-        self.model_name = 'cnn_box'
-        self.num_classes = 2
+        self.model_name = 'mlp_cnn'

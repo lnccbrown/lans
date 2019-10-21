@@ -214,12 +214,15 @@ def train_model(config):
         step = 0
         try:
             while not coord.should_stop():
+                # read pickles
+
                 # train for a step
                 _, tr_images, tr_labels, loss, softmax_outputs = sess.run([train_step,train_images,train_labels, reg_loss, y_conv])
                 print("step={}, loss={}".format(step,loss))
                 step+=1
-                #import ipdb; ipdb.set_trace()
 
+                #import ipdb; ipdb.set_trace()
+                '''
                 # validating the model. main concern is if the weights are shared between
                 # the train and validation model
                 if step % 200 == 0:
@@ -230,6 +233,7 @@ def train_model(config):
                     summary_str = sess.run(summary_op)
                     train_writer.add_summary(summary_str,step)
                 # save the model check point
+                '''
                 if step % 250 == 0:
                     saver.save(sess,os.path.join(
                         config.model_output,
