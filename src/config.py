@@ -6,6 +6,8 @@ class Config(object):
     def __init__(self):
         # Directory setup
         self.base_dir = '/media/data_cifs/lakshmi/projectABC/'
+        self.data_dir = 'data'
+        self.dataset = 'dataset_parallel_*'
 
         # Data configuration
         # Let's say we go with NxHxWxC configuration as of now

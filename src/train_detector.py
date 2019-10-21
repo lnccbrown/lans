@@ -5,12 +5,12 @@ from __future__ import print_function
 import argparse
 import sys
 import tempfile
-import os
+import os, glob, pickle
 import tensorflow as tf
 import config
 from tf_data_handler import inputs
-import os
 import numpy as np
+import tqdm
 
 class cnn_model_struct:
     def __init__(self, trainable=False):
@@ -150,10 +150,9 @@ def kl_divergence(p, q):
 def train_model(config):
 
     with tf.device('/cpu:0'):
-        train_data = tf.placeholder(tf.float32, config.param_dims)
-        train_labels = tf.placeholder(tf.float32, config.output_hist_dims) 
+        train_data = tf.placeholder(tf.float32, [None, 4])
+        train_labels = tf.placeholder(tf.float32, [None, 500, 2]) 
 
-    import ipdb; ipdb.set_trace()
     with tf.device('/gpu:0'):
         with tf.variable_scope("model") as scope:
             print ("creating the model")
@@ -200,6 +199,15 @@ def train_model(config):
     gpuconfig.gpu_options.allow_growth = True
     gpuconfig.allow_soft_placement = True
 
+    pickle_files = glob.glob(os.path.join(config.base_dir, config.data_dir, config.dataset))
+    tr_features, tr_labels = [], []
+    for f in tqdm.tqdm(pickle_files[:10]):
+        data = pickle.load(open(f,'rb'))
+        tr_features.extend(data[1])
+        tr_labels.extend(data[0])
+    tr_features = np.array(tr_features)
+    tr_labels = np.array(tr_labels)
+
     with tf.Session(config=gpuconfig) as sess:
         graph_location = tempfile.mkdtemp()
         print('Saving graph to: %s' % graph_location)
@@ -214,10 +222,8 @@ def train_model(config):
         step = 0
         try:
             while not coord.should_stop():
-                # read pickles
-
                 # train for a step
-                _, tr_images, tr_labels, loss, softmax_outputs = sess.run([train_step,train_images,train_labels, reg_loss, y_conv])
+                _, loss, softmax_outputs = sess.run([train_step, kl_divergence_loss, y_conv],feed_dict={train_data:tr_features[config.train_batch*step: config.train_batch*(step+1)], train_labels:tr_labels[config.train_batch*step: config.train_batch*(step+1)]})
                 print("step={}, loss={}".format(step,loss))
                 step+=1
 
