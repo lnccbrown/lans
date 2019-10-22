@@ -67,7 +67,7 @@ class cnn_model_struct:
             self.h_conv3 = tf.nn.leaky_relu(self.norm3,alpha=0.1)
         print(self.h_conv3.get_shape())
 
-        self.final_layer = self.fc_layer(self.h_conv3, self.get_size(self.h_conv3), 1000, 'final_layer')
+        self.final_layer = self.fc_layer(self.h_conv3, self.get_size(self.h_conv3), np.prod(output_shape), 'final_layer')
         self.final_layer = tf.nn.softmax(self.final_layer)
         self.output = tf.identity(self.final_layer,name='output')
         print(self.output.get_shape())
@@ -149,9 +149,18 @@ def kl_divergence(p, q):
 
 def train_model(config):
 
-    with tf.device('/cpu:0'):
-        train_data = tf.placeholder(tf.float32, [None, 4])
-        train_labels = tf.placeholder(tf.float32, [None, 500, 2]) 
+    train_files = os.path.join(
+			config.base_dir,
+			config.tfrecord_dir,
+			config.train_tfrecords)
+
+    with tf.device('/cpu:0'): 
+	train_data, train_labels = inputs(
+					tfrecord_file=train_files,
+					num_epochs=config.epochs,
+					batch_size=config.train_batch,
+					target_data_dims=config.param_dims,
+					target_label_dims=config.output_hist_dims)
 
     with tf.device('/gpu:0'):
         with tf.variable_scope("model") as scope:
@@ -199,15 +208,6 @@ def train_model(config):
     gpuconfig.gpu_options.allow_growth = True
     gpuconfig.allow_soft_placement = True
 
-    pickle_files = glob.glob(os.path.join(config.base_dir, config.data_dir, config.dataset))
-    tr_features, tr_labels = [], []
-    for f in tqdm.tqdm(pickle_files[:10]):
-        data = pickle.load(open(f,'rb'))
-        tr_features.extend(data[1])
-        tr_labels.extend(data[0])
-    tr_features = np.array(tr_features)
-    tr_labels = np.array(tr_labels)
-
     with tf.Session(config=gpuconfig) as sess:
         graph_location = tempfile.mkdtemp()
         print('Saving graph to: %s' % graph_location)
@@ -223,7 +223,7 @@ def train_model(config):
         try:
             while not coord.should_stop():
                 # train for a step
-                _, loss, softmax_outputs = sess.run([train_step, kl_divergence_loss, y_conv],feed_dict={train_data:tr_features[config.train_batch*step: config.train_batch*(step+1)], train_labels:tr_labels[config.train_batch*step: config.train_batch*(step+1)]})
+                _, loss, softmax_outputs = sess.run([train_step, kl_divergence_loss, y_conv],)
                 print("step={}, loss={}".format(step,loss))
                 step+=1
 

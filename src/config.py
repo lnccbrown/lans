@@ -16,7 +16,7 @@ class Config(object):
         # Data configuration
         # Let's say we go with NxHxWxC configuration as of now
         self.param_dims = [None, 1, 4, 1]
-        self.output_hist_dims = [None, 1, 500, 2]
+        self.output_hist_dims = [None, 1, 256, 2]
         self.results_dir = '/media/data_cifs/lakshmi/projectABC/results/'
         self.model_output = '/media/data_cifs/lakshmi/projectABC/models/cnn-v0'
 	
