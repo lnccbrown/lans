@@ -10,7 +10,7 @@ import tensorflow as tf
 import config
 from tf_data_handler import inputs
 import numpy as np
-import tqdm
+import tqdm, time
 import matplotlib.pyplot as plt
 
 class cnn_model_struct:
@@ -231,6 +231,7 @@ def train_model(config):
         threads = tf.train.start_queue_runners(coord=coord)
 
         step = 0
+	start = time.time()
         try:
             while not coord.should_stop():
                 # train for a step
@@ -251,7 +252,9 @@ def train_model(config):
                 # save the model check point
                 '''
                 if step % 250 == 0:
-                    print("step={}, loss={}".format(step,loss))
+		    finish = time.time()
+                    print("step={}, loss={}, time_elapsed={}s".format(step,loss,finish-start))
+		    start = finish
                     saver.save(sess,os.path.join(
                         config.model_output,
                         config.model_name+'_'+str(step)+'.ckpt'
