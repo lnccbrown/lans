@@ -28,3 +28,8 @@ class Config(object):
         self.val_batch= 64
         self.test_batch = 64
         self.model_name = 'mlp_cnn'
+
+	# how often should the training stats be printed?
+	self.print_iters = 250
+	# how often do you want to validate?
+	self.val_iters = 1000

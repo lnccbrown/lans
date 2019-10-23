@@ -251,16 +251,16 @@ def train_model(config):
                     train_writer.add_summary(summary_str,step)
                 # save the model check point
                 '''
-                if step % 250 == 0:
+                if step % config.print_iters == 0:
 		    finish = time.time()
-                    print("step={}, loss={}, time_elapsed={}s".format(step,loss,finish-start))
+                    print("step={}, loss={}, time_elapsed={} s/step".format(step,loss,(finish-start)/float(config.print_iters)))
 		    start = finish
                     saver.save(sess,os.path.join(
                         config.model_output,
                         config.model_name+'_'+str(step)+'.ckpt'
                     ),global_step=step)
 
-		if step % 1000 == 0:
+		if step % config.val_iters == 0:
 		    v_data, v_labels, v_res, v_loss = sess.run([val_data, val_labels, val_res, val_loss])
 		    print("\t val loss = {}".format(v_loss))
 		    for kk in range(10):
