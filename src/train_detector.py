@@ -134,7 +134,8 @@ class cnn_model_struct:
             else:
                 var = tf.get_variable(name=var_name, initializer=value)
         else:
-            var = tf.constant(value, dtype=tf.float32, name=var_name)
+            #var = tf.constant(value, dtype=tf.float32, name=var_name)
+	    var = tf.get_variable(name=var_name, initializer=value)
 
         self.var_dict[(name, idx)] = var
 
@@ -154,12 +155,22 @@ def train_model(config):
 			config.base_dir,
 			config.tfrecord_dir,
 			config.train_tfrecords)
+    val_files = os.path.join(
+			config.base_dir,
+			config.tfrecord_dir,
+			config.val_tfrecords)
 
     with tf.device('/cpu:0'): 
 	train_data, train_labels = inputs(
 					tfrecord_file=train_files,
 					num_epochs=config.epochs,
 					batch_size=config.train_batch,
+					target_data_dims=config.param_dims,
+					target_label_dims=config.output_hist_dims)
+	val_data, val_labels = inputs(
+					tfrecord_file=val_files,
+					num_epochs=config.epochs,
+					batch_size=config.val_batch,
 					target_data_dims=config.param_dims,
 					target_label_dims=config.output_hist_dims)
 
@@ -190,14 +201,12 @@ def train_model(config):
             '''
             # Use this if we want to run validation online
             '''
-            '''
             print("building a validation model")
             with tf.variable_scope('val_model', reuse=tf.AUTO_REUSE):
-                val_model = cnn_model_struct()
-                val_model.build(val_images, config.num_classes, train_mode=False)
+                val_model = cnn_model_struct(trainable=False)
+                val_model.build(val_data, config.param_dims[1:], config.output_hist_dims[1:],train_mode=False)
                 val_res = val_model.output
-                val_error =  tf.reduce_mean(tf.sqrt(tf.reduce_sum(tf.square(val_labels-val_res))))
-            '''
+                val_loss =  kl_divergence(val_res, tf.reshape(val_labels, [-1,np.prod(config.output_hist_dims[1:])]))
 
             tf.summary.scalar("loss", kl_divergence_loss)
             #tf.summary.scalar("train error", accuracy)
@@ -248,13 +257,16 @@ def train_model(config):
                     ),global_step=step)
 
 		if step % 1000 == 0:
+		    v_data, v_labels, v_res, v_loss = sess.run([val_data, val_labels, val_res, val_loss])
+		    print("\t val loss = {}".format(v_loss))
 		    for kk in range(10):
-			X = softmax_outputs[kk].reshape(256,2); 
+			X = v_res[kk].reshape(256,2); 
 			plt.plot(X[:,0],color='r',alpha=0.5); plt.plot(X[:,1],color='b',alpha=0.5); 
-			plt.plot(tr_labels[kk][:,0],'-.r',alpha=0.5); 
-			plt.plot(tr_labels[kk][:,1],'-.b',alpha=0.5); 
+			plt.plot(v_labels[kk][:,0],'-.r',alpha=0.5); 
+			plt.plot(v_labels[kk][:,1],'-.b',alpha=0.5); 
 			plt.pause(1);
 			plt.clf()
+
         except tf.errors.OutOfRangeError:
             print("Finished training for %d epochs" % config.epochs)
         finally:

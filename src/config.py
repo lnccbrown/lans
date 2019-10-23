@@ -25,6 +25,6 @@ class Config(object):
         # Model hyperparameters
         self.epochs = 100
         self.train_batch = 64
-        self.val_batch= 8
-        self.test_batch = 1
+        self.val_batch= 64
+        self.test_batch = 64
         self.model_name = 'mlp_cnn'
