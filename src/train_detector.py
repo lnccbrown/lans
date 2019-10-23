@@ -14,7 +14,7 @@ import tqdm
 import matplotlib.pyplot as plt
 
 class cnn_model_struct:
-    def __init__(self, trainable=False):
+    def __init__(self, trainable=True):
         self.trainable = trainable
         self.data_dict = None
         self.var_dict = {}
@@ -45,7 +45,7 @@ class cnn_model_struct:
         self.upsample4 = tf.expand_dims(tf.expand_dims(self.upsample4,1),-1)
 
         # conv layer 1
-        with tf.name_scope('conv1'):
+        with tf.variable_scope('conv1'):
             self.W_conv1 = self.weight_variable([1, 5, 1, 8],var_name='wconv1')
             self.b_conv1 = self.bias_variable([8],var_name='bconv1')
             self.norm1 = tf.layers.batch_normalization(self.conv2d(self.upsample4, self.W_conv1,stride=[1,2,2,1]) + self.b_conv1,scale=True,center=True,training=train_mode)
@@ -53,7 +53,7 @@ class cnn_model_struct:
         print(self.h_conv1.get_shape())
 
         # conv layer 2
-        with tf.name_scope('conv2'):
+        with tf.variable_scope('conv2'):
             self.W_conv2 = self.weight_variable([1, 5, 8, 4],var_name='wconv2')
             self.b_conv2 = self.bias_variable([4],var_name='bconv2')
             self.norm2 = tf.layers.batch_normalization(self.conv2d(self.h_conv1, self.W_conv2, stride=[1, 1, 1, 1]) + self.b_conv2,scale=True,center=True,training=train_mode)
@@ -61,7 +61,7 @@ class cnn_model_struct:
         print(self.h_conv2.get_shape())
 
         # conv layer 3
-        with tf.name_scope('conv3'):
+        with tf.variable_scope('conv3'):
             self.W_conv3 = self.weight_variable([1, 5, 4, 2],var_name='wconv3')
             self.b_conv3 = self.bias_variable([2],var_name='bconv3')
             self.norm3 = tf.layers.batch_normalization(self.conv2d(self.h_conv2, self.W_conv3, stride=[1, 1, 1, 1]) + self.b_conv3, scale=True,center=True,training=train_mode)
@@ -134,8 +134,8 @@ class cnn_model_struct:
             else:
                 var = tf.get_variable(name=var_name, initializer=value)
         else:
-            #var = tf.constant(value, dtype=tf.float32, name=var_name)
-	    var = tf.get_variable(name=var_name, initializer=value)
+            var = tf.constant(value, dtype=tf.float32, name=var_name)
+	    #var = tf.get_variable(name=var_name, initializer=value)
 
         self.var_dict[(name, idx)] = var
 
@@ -177,7 +177,7 @@ def train_model(config):
     with tf.device('/gpu:0'):
         with tf.variable_scope("model") as scope:
             print ("creating the model")
-            model = cnn_model_struct(trainable=True)
+            model = cnn_model_struct()
             model.build(train_data, config.param_dims[1:], config.output_hist_dims[1:],train_mode=True)
             y_conv = model.output
 
@@ -198,15 +198,16 @@ def train_model(config):
             #     lab_shaped = tf.reshape(train_labels, [config.train_batch, config.num_classes])
             # accuracy = calc_error(lab_shaped, res_shaped)
 
-            '''
-            # Use this if we want to run validation online
-            '''
+	    #####
+	    ## VALIDATION
+	    #####
             print("building a validation model")
-            with tf.variable_scope('val_model', reuse=tf.AUTO_REUSE):
-                val_model = cnn_model_struct(trainable=False)
-                val_model.build(val_data, config.param_dims[1:], config.output_hist_dims[1:],train_mode=False)
-                val_res = val_model.output
-                val_loss =  kl_divergence(val_res, tf.reshape(val_labels, [-1,np.prod(config.output_hist_dims[1:])]))
+            #with tf.variable_scope('val_model', reuse=tf.AUTO_REUSE):
+	    scope.reuse_variables()
+            val_model = cnn_model_struct()
+            val_model.build(val_data, config.param_dims[1:], config.output_hist_dims[1:],train_mode=False)
+            val_res = val_model.output
+            val_loss =  kl_divergence(val_res, tf.reshape(val_labels, [-1,np.prod(config.output_hist_dims[1:])]))
 
             tf.summary.scalar("loss", kl_divergence_loss)
             #tf.summary.scalar("train error", accuracy)
