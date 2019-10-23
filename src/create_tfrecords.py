@@ -19,7 +19,7 @@ def main(
 				experiment))
 
     # collect all the samples
-    for data_file in tqdm.tqdm(data_files[:10]):
+    for data_file in tqdm.tqdm(data_files):
 	data = pickle.load(open(data_file,'rb'))
 	all_features.extend(data[1].astype(np.float32))
 	all_labels.extend(data[0].astype(np.float32))

@@ -11,6 +11,7 @@ import config
 from tf_data_handler import inputs
 import numpy as np
 import tqdm
+import matplotlib.pyplot as plt
 
 class cnn_model_struct:
     def __init__(self, trainable=False):
@@ -171,7 +172,7 @@ def train_model(config):
 
             # Define loss and optimizer
             with tf.name_scope('loss'):
-                kl_divergence_loss = kl_divergence(y_conv, tf.reshape(train_labels,[-1,1000]))
+                kl_divergence_loss = kl_divergence(y_conv, tf.reshape(train_labels,[-1,np.prod(config.output_hist_dims[1:])]))
 
             with tf.name_scope('adam_optimizer'):
                 # wd_l = [v for v in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES) if 'biases' not in v.name]
@@ -223,8 +224,7 @@ def train_model(config):
         try:
             while not coord.should_stop():
                 # train for a step
-                _, loss, softmax_outputs = sess.run([train_step, kl_divergence_loss, y_conv],)
-                print("step={}, loss={}".format(step,loss))
+                _, loss, softmax_outputs, tr_data, tr_labels = sess.run([train_step, kl_divergence_loss, y_conv, train_data, train_labels])
                 step+=1
 
                 #import ipdb; ipdb.set_trace()
@@ -241,11 +241,20 @@ def train_model(config):
                 # save the model check point
                 '''
                 if step % 250 == 0:
+                    print("step={}, loss={}".format(step,loss))
                     saver.save(sess,os.path.join(
                         config.model_output,
                         config.model_name+'_'+str(step)+'.ckpt'
                     ),global_step=step)
 
+		if step % 1000 == 0:
+		    for kk in range(10):
+			X = softmax_outputs[kk].reshape(256,2); 
+			plt.plot(X[:,0],color='r',alpha=0.5); plt.plot(X[:,1],color='b',alpha=0.5); 
+			plt.plot(tr_labels[kk][:,0],'-.r',alpha=0.5); 
+			plt.plot(tr_labels[kk][:,1],'-.b',alpha=0.5); 
+			plt.pause(1);
+			plt.clf()
         except tf.errors.OutOfRangeError:
             print("Finished training for %d epochs" % config.epochs)
         finally:

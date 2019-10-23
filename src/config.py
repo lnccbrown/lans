@@ -7,11 +7,11 @@ class Config(object):
         # Directory setup
         self.base_dir = '/media/data_cifs/lakshmi/projectABC/'
         self.data_dir = 'data'
-        self.dataset = 'angle_binned*'
+        self.dataset = 'ddm_binned*'
 	self.tfrecord_dir = 'tfrecords'
-	self.train_tfrecords = 'angle_train.tfrecords'
-	self.val_tfrecords = 'angle_val.tfrecords'
-	self.test_tfrecords = 'angle_test.tfrecords'
+	self.train_tfrecords = 'ddm_train.tfrecords'
+	self.val_tfrecords = 'ddm_val.tfrecords'
+	self.test_tfrecords = 'ddm_test.tfrecords'
 
         # Data configuration
         # Let's say we go with NxHxWxC configuration as of now
