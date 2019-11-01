@@ -11,6 +11,8 @@ from train_detector import cnn_model_struct
 import config
 from scipy.optimize import differential_evolution
 import numpy as np
+import tqdm
+import matplotlib.pyplot as plt
 
 class Infer:
     def __init__(self, config):
@@ -46,11 +48,25 @@ class Infer:
 	return self.klDivergence(pred_hist, self.target)
 
 def model_inference():
-    import ipdb; ipdb.set_trace()
     cfg = config.Config()
     inference_class = Infer(config=cfg)
     bounds = [(-2,2), (-2,2), (-2,2), (-2,2), (-2,2)]
-    output = differential_evolution(inference_class.objectivefn,bounds)
+    simulated_data = pickle.load(open('../data/angle_ndt_base_simulations_1.pickle','rb'))
+    nsamples = simulated_data[0].shape[0]
+    #nsamples = 10
+
+    recovered_params = []
+    for idx in tqdm.tqdm(np.arange(nsamples)):
+	inference_class.target = simulated_data[0][idx].reshape((-1,))
+	output = differential_evolution(inference_class.objectivefn,bounds)
+	recovered_params.append(output.x)
+    #import ipdb; ipdb.set_trace()
+
+    RP = np.array(recovered_params)
+    # make the plots
+    for k in range(5):
+        plt.figure(); plt.scatter(simulated_data[1][:nsamples,k], RP[:nsamples,k]); plt.xlabel('groundtruth parameter value'); plt.ylabel('recovered parameter value'); plt.title('angle_ndt param #{}'.format(k))
+    plt.show(); 
 
 if __name__ == '__main__':
     model_inference()
