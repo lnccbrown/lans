@@ -12,6 +12,7 @@ from tf_data_handler import inputs
 import numpy as np
 import tqdm, time
 import matplotlib.pyplot as plt
+import math
 
 class cnn_model_struct:
     def __init__(self, trainable=True):
@@ -147,7 +148,7 @@ def calc_error(labels,predictions):
     return tf.reduce_mean(tf.sqrt(tf.reduce_sum(tf.square(labels-predictions), 1)),0)
 
 def kl_divergence(p, q): 
-    return tf.reduce_sum(p * tf.log(p/q))
+    return tf.reduce_sum(p * tf.log(1e-30 + p/q))
 
 def train_model(config):
 
@@ -209,7 +210,10 @@ def train_model(config):
             val_res = val_model.output
             val_loss =  kl_divergence(val_res, tf.reshape(val_labels, [-1,np.prod(config.output_hist_dims[1:])]))
 
+	    img = tf.expand_dims(tf.reshape(train_labels,[-1,32,16]),axis=-1)
             tf.summary.scalar("loss", kl_divergence_loss)
+	    tf.summary.image("groundtruth", img)
+	    #tf.summary.histogram("predictions",y_conv)
             #tf.summary.scalar("train error", accuracy)
             #tf.summary.scalar("validation error", val_error)
             summary_op = tf.summary.merge_all()
@@ -220,9 +224,9 @@ def train_model(config):
     gpuconfig.allow_soft_placement = True
 
     with tf.Session(config=gpuconfig) as sess:
-        graph_location = tempfile.mkdtemp()
-        print('Saving graph to: %s' % graph_location)
-        train_writer = tf.summary.FileWriter(graph_location)
+        #graph_location = tempfile.mkdtemp()
+        #print('Saving graph to: %s' % graph_location)
+        train_writer = tf.summary.FileWriter(os.path.join(config.base_dir,config.summary_dir))
         train_writer.add_graph(tf.get_default_graph())
 
         init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
@@ -237,7 +241,8 @@ def train_model(config):
                 # train for a step
                 _, loss, softmax_outputs, tr_data, tr_labels = sess.run([train_step, kl_divergence_loss, y_conv, train_data, train_labels])
                 step+=1
-
+		if math.isnan(loss):
+			import ipdb; ipdb.set_trace()
                 #import ipdb; ipdb.set_trace()
                 '''
                 # validating the model. main concern is if the weights are shared between
@@ -261,12 +266,18 @@ def train_model(config):
                     ),global_step=step)
 
 		if step % config.val_iters == 0:
+		    val_forward_pass_time = time.time()
 		    v_data, v_labels, v_res, v_loss = sess.run([val_data, val_labels, val_res, val_loss])
-		    print("\t val loss = {}".format(v_loss))
-		    for kk in range(10):
-			X = v_res[kk].reshape(256,2); 
-			plt.plot(X[:,0],color='r',alpha=0.5); plt.plot(X[:,1],color='b',alpha=0.5); 
-			plt.plot(v_labels[kk][:,0],'-.r',alpha=0.5); 
+
+		    summary_str = sess.run(summary_op)
+		    train_writer.add_summary(summary_str, step)
+		    print("\t val loss = {}, time_elapsed = {}s".format(v_loss, time.time() - val_forward_pass_time))
+		    for kk in range(1):
+			X = v_res[kk].reshape(-1,2); 
+			plt.plot(X[:,0],color='r',alpha=0.5); 
+			plt.plot(v_labels[kk][:,0],'-.r',alpha=0.5);
+			plt.legend(['Model','Groundtruth']) 
+			plt.plot(X[:,1],color='b',alpha=0.5); 
 			plt.plot(v_labels[kk][:,1],'-.b',alpha=0.5); 
 			plt.pause(1);
 			plt.clf()
