@@ -13,6 +13,8 @@ from scipy.optimize import differential_evolution
 import numpy as np
 import tqdm
 import matplotlib.pyplot as plt
+from multiprocessing import Pool
+tf.logging.set_verbosity(3)
 
 class Infer:
     def __init__(self, config):
@@ -21,7 +23,7 @@ class Infer:
 	self.inp = tf.placeholder(tf.float32, self.cfg.test_param_dims)
 	self.initialized = False
 	with tf.device('/gpu:0'):
-	    with tf.variable_scope("model") as scope:
+	    with tf.variable_scope("model", reuse=tf.AUTO_REUSE) as scope:
 		self.model = cnn_model_struct()
 		self.model.build(self.inp, self.cfg.test_param_dims[1:], self.cfg.output_hist_dims[1:], train_mode=False)
 	    self.gpuconfig = tf.ConfigProto()
@@ -47,26 +49,25 @@ class Infer:
 	pred_hist = self.sess.run(self.model.output, feed_dict={self.inp:params.reshape(1,1,5,1)})
 	return self.klDivergence(pred_hist, self.target)
 
-def model_inference():
+def model_inference(simdata):
     cfg = config.Config()
     inference_class = Infer(config=cfg)
     bounds = [(-2,2), (-2,2), (-2,2), (-2,2), (-2,2)]
-    simulated_data = pickle.load(open('../data/angle_ndt_base_simulations_1.pickle','rb'))
-    nsamples = simulated_data[0].shape[0]
-    #nsamples = 10
+    inference_class.target = simdata.reshape((-1,))
+    output = differential_evolution(inference_class.objectivefn,bounds)
+    return output.x
 
-    recovered_params = []
-    for idx in tqdm.tqdm(np.arange(nsamples)):
-	inference_class.target = simulated_data[0][idx].reshape((-1,))
-	output = differential_evolution(inference_class.objectivefn,bounds)
-	recovered_params.append(output.x)
-    #import ipdb; ipdb.set_trace()
-
-    RP = np.array(recovered_params)
+    #RP = np.array(recovered_params)
     # make the plots
-    for k in range(5):
-        plt.figure(); plt.scatter(simulated_data[1][:nsamples,k], RP[:nsamples,k]); plt.xlabel('groundtruth parameter value'); plt.ylabel('recovered parameter value'); plt.title('angle_ndt param #{}'.format(k))
-    plt.show(); 
+    #for k in range(5):
+    #    plt.figure(); plt.scatter(simulated_data[1][:nsamples,k], RP[:nsamples,k]); plt.xlabel('groundtruth parameter value'); plt.ylabel('recovered parameter value'); plt.title('angle_ndt param #{}'.format(k))
+    #plt.show(); 
 
 if __name__ == '__main__':
-    model_inference()
+    n_workers = 25
+    workers = Pool(n_workers)
+
+    simulated_data = pickle.load(open('../data/angle_ndt_base_simulations_1.pickle','rb'))
+    simulated_data = simulated_data[0][:10]
+    X = workers.map(model_inference, simulated_data)
+    import ipdb; ipdb.set_trace()
