@@ -15,7 +15,10 @@ import tqdm
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from multiprocessing import Pool
-tf.logging.set_verbosity(3)
+
+# just to prevent tensorflow from printing logs
+os.environ['TF_CPP_MIN_LOG_LEVEL']="2"
+tf.logging.set_verbosity(tf.logging.ERROR)
 
 class Infer:
     def __init__(self, config):
@@ -26,7 +29,7 @@ class Infer:
 	with tf.device('/gpu:0'):
 	    with tf.variable_scope("model", reuse=tf.AUTO_REUSE) as scope:
 		self.model = cnn_model_struct()
-		self.model.build(self.inp, self.cfg.test_param_dims[1:], self.cfg.output_hist_dims[1:], train_mode=False)
+		self.model.build(self.inp, self.cfg.test_param_dims[1:], self.cfg.output_hist_dims[1:], train_mode=False, verbose=False)
 	    self.gpuconfig = tf.ConfigProto()
 	    self.gpuconfig.gpu_options.allow_growth = True
 	    self.gpuconfig.allow_soft_placement = True
@@ -61,13 +64,12 @@ def model_inference(simdata):
 if __name__ == '__main__':
     n_workers = 25
     workers = Pool(n_workers)
-
     simulated_data = pickle.load(open('../data/angle_ndt_base_simulations_1.pickle','rb'))
     simulated_data = simulated_data[0][:100]
     nsamples = simulated_data.shape[0]
     
     rec_params = []
-    for _ in tqdm.tqdm(workers.map(model_inference, simulated_data), total=nsamples):
+    for _ in tqdm.tqdm(workers.imap(model_inference, simulated_data), total=nsamples):
 	rec_params.append(_)
 	pass
     

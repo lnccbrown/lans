@@ -29,19 +29,24 @@ class cnn_model_struct:
     def get_size(self, input_data):
         return np.prod([int(x) for x in input_data.get_shape()[1:]])
 
-    def build(self, input_data, input_shape, output_shape, train_mode=None):
-        print ("Building the network...")
+    def build(self, input_data, input_shape, output_shape, train_mode=None, verbose=True):
+	if verbose:
+            print ("Building the network...")
         network_input = tf.identity(input_data, name='input')
         with tf.name_scope('reshape'):
             x_data = tf.reshape(network_input, [-1, input_shape[0], input_shape[1], input_shape[2]])
         self.upsample1 = self.fc_layer(x_data, self.get_size(x_data), 16, 'upsample1')
-        print(self.upsample1.get_shape())
+	if verbose:
+            print(self.upsample1.get_shape())
         self.upsample2 = self.fc_layer(self.upsample1, self.get_size(self.upsample1), 64, 'upsample2')
-        print(self.upsample2.get_shape())
+	if verbose:
+            print(self.upsample2.get_shape())
         self.upsample3 = self.fc_layer(self.upsample2, self.get_size(self.upsample2), 256, 'upsample3')
-        print(self.upsample3.get_shape())
+	if verbose:
+            print(self.upsample3.get_shape())
         self.upsample4 = self.fc_layer(self.upsample3, self.get_size(self.upsample3), 1024, 'upsample4')
-        print(self.upsample4.get_shape())
+	if verbose:
+            print(self.upsample4.get_shape())
 
         self.upsample4 = tf.expand_dims(tf.expand_dims(self.upsample4,1),-1)
 
@@ -51,7 +56,8 @@ class cnn_model_struct:
             self.b_conv1 = self.bias_variable([8],var_name='bconv1')
             self.norm1 = tf.layers.batch_normalization(self.conv2d(self.upsample4, self.W_conv1,stride=[1,2,2,1]) + self.b_conv1,scale=True,center=True,training=train_mode)
             self.h_conv1 = tf.nn.leaky_relu(self.norm1, alpha=0.1)
-        print(self.h_conv1.get_shape())
+	if verbose:
+            print(self.h_conv1.get_shape())
 
         # conv layer 2
         with tf.variable_scope('conv2'):
@@ -59,7 +65,8 @@ class cnn_model_struct:
             self.b_conv2 = self.bias_variable([4],var_name='bconv2')
             self.norm2 = tf.layers.batch_normalization(self.conv2d(self.h_conv1, self.W_conv2, stride=[1, 1, 1, 1]) + self.b_conv2,scale=True,center=True,training=train_mode)
             self.h_conv2 = tf.nn.leaky_relu(self.norm2, alpha=0.1)
-        print(self.h_conv2.get_shape())
+	if verbose:
+            print(self.h_conv2.get_shape())
 
         # conv layer 3
         with tf.variable_scope('conv3'):
@@ -67,12 +74,14 @@ class cnn_model_struct:
             self.b_conv3 = self.bias_variable([2],var_name='bconv3')
             self.norm3 = tf.layers.batch_normalization(self.conv2d(self.h_conv2, self.W_conv3, stride=[1, 1, 1, 1]) + self.b_conv3, scale=True,center=True,training=train_mode)
             self.h_conv3 = tf.nn.leaky_relu(self.norm3,alpha=0.1)
-        print(self.h_conv3.get_shape())
+	if verbose:
+            print(self.h_conv3.get_shape())
 
         self.final_layer = self.fc_layer(self.h_conv3, self.get_size(self.h_conv3), np.prod(output_shape), 'final_layer')
         self.final_layer = tf.nn.softmax(self.final_layer)
         self.output = tf.identity(self.final_layer,name='output')
-        print(self.output.get_shape())
+	if verbose:
+            print(self.output.get_shape())
 
     def conv2d(self, x, W, stride=[1,1,1,1]):
         """conv2d returns a 2d convolution layer with full stride."""
