@@ -13,6 +13,7 @@ from scipy.optimize import differential_evolution
 import numpy as np
 import tqdm
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from multiprocessing import Pool
 tf.logging.set_verbosity(3)
 
@@ -57,17 +58,24 @@ def model_inference(simdata):
     output = differential_evolution(inference_class.objectivefn,bounds)
     return output.x
 
-    #RP = np.array(recovered_params)
-    # make the plots
-    #for k in range(5):
-    #    plt.figure(); plt.scatter(simulated_data[1][:nsamples,k], RP[:nsamples,k]); plt.xlabel('groundtruth parameter value'); plt.ylabel('recovered parameter value'); plt.title('angle_ndt param #{}'.format(k))
-    #plt.show(); 
-
 if __name__ == '__main__':
     n_workers = 25
     workers = Pool(n_workers)
 
     simulated_data = pickle.load(open('../data/angle_ndt_base_simulations_1.pickle','rb'))
-    simulated_data = simulated_data[0][:10]
-    X = workers.map(model_inference, simulated_data)
-    import ipdb; ipdb.set_trace()
+    simulated_data = simulated_data[0][:100]
+    nsamples = simulated_data.shape[0]
+    
+    rec_params = []
+    for _ in tqdm.tqdm(workers.map(model_inference, simulated_data), total=nsamples):
+	rec_params.append(_)
+	pass
+    
+    # plot the results
+    rec_params = np.array(rec_params)
+    GT = pickle.load(open('../data/angle_ndt_base_simulations_1.pickle','rb'))[1][:nsamples]
+    cmap = mpl.cm.get_cmap('Paired')
+    for k in range(GT.shape[1]):
+	plt.figure()
+	plt.scatter(GT[:,k],rec_params[:,k],c=cmap(k))
+    plt.show()
