@@ -11,8 +11,8 @@ class Config(object):
 	self.summary_dir = 'summaries'
 
 	# select dataset
-	#self.angle_initialize()
-	self.race_model_5_initialize()
+	self.angle_initialize()
+	#self.race_model_6_initialize()
 
 	self.train_tfrecords = self.dataset_dir+'_train.tfrecords'
 	self.val_tfrecords = self.dataset_dir+'_val.tfrecords'
@@ -36,7 +36,7 @@ class Config(object):
 	# how often do you want to validate?
 	self.val_iters = 1000
 
-	self.inference_dataset = '../data/angle_ndt_base_simulations_1.pickle'
+	self.inference_dataset = '../data/angle/parameter_recovery/angle_param_recovery_data_n_3000.pickle'
 
     def angle_initialize(self):
 	self.dataset_dir = 'angle_ndt'

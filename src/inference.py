@@ -62,9 +62,10 @@ def model_inference(simdata):
     return output.x
 
 if __name__ == '__main__':
+    cfg = config.Config()
     n_workers = 25
     workers = Pool(n_workers)
-    simulated_data = pickle.load(open(config.Config().inference_dataset,'rb'))
+    simulated_data = pickle.load(open(cfg.inference_dataset,'rb'))
     simulated_data = simulated_data[0][:100]
     nsamples = simulated_data.shape[0]
     
@@ -75,9 +76,15 @@ if __name__ == '__main__':
     
     # plot the results
     rec_params = np.array(rec_params)
-    GT = pickle.load(open(config.Config().inference_dataset,'rb'))[1][:nsamples]
+    GT = pickle.load(open(cfg.inference_dataset,'rb'))[1][:nsamples]
     cmap = mpl.cm.get_cmap('Paired')
+    nplots = GT.shape[1]
+    fig, ax = plt.subplots(int(np.ceil(nplots/3.)), 3, sharex='col', sharey='row')
     for k in range(GT.shape[1]):
-	plt.figure()
-	plt.scatter(GT[:,k],rec_params[:,k],c=cmap(k))
-    plt.show()
+	ax[int(k/3),(k%3)].scatter(GT[:,k],rec_params[:,k])
+	ax[int(k/3),(k%3)].set_title('Parameter {}'.format(k+1))
+	ax[int(k/3),(k%3)].set_xlabel('true parameters')
+	ax[int(k/3),(k%3)].set_ylabel('recovered parameters')
+    plt.savefig(os.path.join(cfg.results_dir,cfg.inference_dataset.split('/')[-1].split('.')[0]+'_recovery.png'))
+    plt.close()
+    #plt.show()

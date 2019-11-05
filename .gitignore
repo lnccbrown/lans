@@ -2,5 +2,6 @@ data/*
 models/*
 tfrecords/*
 summaries/*
+results/*
 *.pyc
 *.swp
