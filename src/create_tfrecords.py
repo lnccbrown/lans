@@ -63,7 +63,7 @@ def main(
 if __name__ == '__main__':
     config = config.Config()
     main(
-        data_folder= os.path.join(config.base_dir,config.data_dir),
+        data_folder= os.path.join(config.base_dir,config.data_dir, config.dataset_dir),
         experiment=config.dataset,
         tfrecord_dir= os.path.join(config.base_dir, config.tfrecord_dir),
         config=config

@@ -219,9 +219,9 @@ def train_model(config):
             val_res = val_model.output
             val_loss =  kl_divergence(val_res, tf.reshape(val_labels, [-1,np.prod(config.output_hist_dims[1:])]))
 
-	    img = tf.expand_dims(tf.reshape(train_labels,[-1,32,16]),axis=-1)
+	    #img = tf.expand_dims(tf.reshape(train_labels,[-1,32,16]),axis=-1)
             tf.summary.scalar("loss", kl_divergence_loss)
-	    tf.summary.image("groundtruth", img)
+	    #tf.summary.image("groundtruth", img)
 	    #tf.summary.histogram("predictions",y_conv)
             #tf.summary.scalar("train error", accuracy)
             #tf.summary.scalar("validation error", val_error)
@@ -281,6 +281,7 @@ def train_model(config):
 		    summary_str = sess.run(summary_op)
 		    train_writer.add_summary(summary_str, step)
 		    print("\t val loss = {}, time_elapsed = {}s".format(v_loss, time.time() - val_forward_pass_time))
+		    '''
 		    for kk in range(1):
 			X = v_res[kk].reshape(-1,2); 
 			plt.plot(X[:,0],color='r',alpha=0.5); 
@@ -290,7 +291,7 @@ def train_model(config):
 			plt.plot(v_labels[kk][:,1],'-.b',alpha=0.5); 
 			plt.pause(1);
 			plt.clf()
-
+		    '''
         except tf.errors.OutOfRangeError:
             print("Finished training for %d epochs" % config.epochs)
         finally:
