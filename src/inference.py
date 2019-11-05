@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from multiprocessing import Pool
 
+plt.rcParams['font.size']= 6
 # just to prevent tensorflow from printing logs
 os.environ['TF_CPP_MIN_LOG_LEVEL']="2"
 tf.logging.set_verbosity(tf.logging.ERROR)
@@ -23,7 +24,8 @@ tf.logging.set_verbosity(tf.logging.ERROR)
 class Infer:
     def __init__(self, config):
 	self.cfg = config
-	self.target = pickle.load(open(self.cfg.inference_dataset,'rb'))[0][0].reshape((-1,))
+	#self.target = pickle.load(open(self.cfg.inference_dataset,'rb'))[0][0].reshape((-1,))
+	self.target = []
 	self.inp = tf.placeholder(tf.float32, self.cfg.test_param_dims)
 	self.initialized = False
 	with tf.device('/gpu:0'):
@@ -44,6 +46,9 @@ class Infer:
     def klDivergence(self, x, y, eps1=1e-7, eps2=1e-30):
 	return np.sum(x * np.log(eps2 + x/(y+eps1)))
 
+    def likelihood(self, x, y, eps=1e-7):
+	return np.sum(-np.log(x+eps)*y)
+
     def objectivefn(self, params):
 	if self.initialized == False:
 	    self.sess = tf.Session(config=self.gpuconfig)
@@ -51,12 +56,15 @@ class Infer:
 	    self.saver.restore(self.sess, ckpts)
 	    self.initialized = True
 	pred_hist = self.sess.run(self.model.output, feed_dict={self.inp:params.reshape(self.cfg.test_param_dims)})
-	return self.klDivergence(pred_hist, self.target)
+	#return self.klDivergence(pred_hist, self.target)
+	return self.likelihood(pred_hist, self.target)
 
 def model_inference(simdata):
     cfg = config.Config()
     inference_class = Infer(config=cfg)
-    bounds = [(-2,2), (-2,2), (-2,2), (-2,2), (-2,2)]
+    bounds = []
+    for k in range(np.prod(cfg.test_param_dims[-2:])):
+        bounds.append((-2,2))
     inference_class.target = simdata.reshape((-1,))
     output = differential_evolution(inference_class.objectivefn,bounds)
     return output.x
@@ -64,27 +72,26 @@ def model_inference(simdata):
 if __name__ == '__main__':
     cfg = config.Config()
     n_workers = 25
-    workers = Pool(n_workers)
-    simulated_data = pickle.load(open(cfg.inference_dataset,'rb'))
-    simulated_data = simulated_data[0][:100]
-    nsamples = simulated_data.shape[0]
-    
-    rec_params = []
-    for _ in tqdm.tqdm(workers.imap(model_inference, simulated_data), total=nsamples):
-	rec_params.append(_)
-	pass
-    
-    # plot the results
-    rec_params = np.array(rec_params)
-    GT = pickle.load(open(cfg.inference_dataset,'rb'))[1][:nsamples]
-    cmap = mpl.cm.get_cmap('Paired')
-    nplots = GT.shape[1]
-    fig, ax = plt.subplots(int(np.ceil(nplots/3.)), 3, sharex='col', sharey='row')
-    for k in range(GT.shape[1]):
-	ax[int(k/3),(k%3)].scatter(GT[:,k],rec_params[:,k])
-	ax[int(k/3),(k%3)].set_title('Parameter {}'.format(k+1))
-	ax[int(k/3),(k%3)].set_xlabel('true parameters')
-	ax[int(k/3),(k%3)].set_ylabel('recovered parameters')
-    plt.savefig(os.path.join(cfg.results_dir,cfg.inference_dataset.split('/')[-1].split('.')[0]+'_recovery.png'))
-    plt.close()
-    #plt.show()
+    for infdata in cfg.inference_dataset:
+        workers = Pool(n_workers)
+        simulated_data = pickle.load(open(infdata,'rb'))
+        simulated_data = simulated_data[0]
+        nsamples = simulated_data.shape[0]    
+        rec_params = []
+        for _ in tqdm.tqdm(workers.imap(model_inference, simulated_data), total=nsamples):
+    	    rec_params.append(_)
+            pass
+        # plot the results
+        rec_params = np.array(rec_params)
+        GT = pickle.load(open(infdata,'rb'))[1][:nsamples]
+        cmap = mpl.cm.get_cmap('Paired')
+        nplots = GT.shape[1]
+        fig, ax = plt.subplots(int(np.ceil(nplots/3.)), 3)
+        for k in range(GT.shape[1]):
+    	    ax[int(k/3),(k%3)].scatter(GT[:,k],rec_params[:,k],5,alpha=0.5)
+	    ax[int(k/3),(k%3)].set_title('Parameter {}'.format(k+1),fontsize=6)
+	    ax[int(k/3),(k%3)].set_xlabel('true parameters')
+	    ax[int(k/3),(k%3)].set_ylabel('recovered parameters')
+        plt.savefig(os.path.join(cfg.results_dir,infdata.split('/')[-1].split('.')[0]+'_recovery.png'), dpi=300, bbox_inches='tight')
+        plt.close()
+        #plt.show()

@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import glob
 
 class Config(object):
 
@@ -11,7 +12,7 @@ class Config(object):
 	self.summary_dir = 'summaries'
 
 	# select dataset
-	self.angle_initialize()
+	self.race_model_3_initialize()
 	#self.race_model_6_initialize()
 
 	self.train_tfrecords = self.dataset_dir+'_train.tfrecords'
@@ -36,7 +37,7 @@ class Config(object):
 	# how often do you want to validate?
 	self.val_iters = 1000
 
-	self.inference_dataset = '../data/angle/parameter_recovery/angle_param_recovery_data_n_3000.pickle'
+	self.inference_dataset = glob.glob('../data/race_model_3/parameter_recovery/*')
 
     def angle_initialize(self):
 	self.dataset_dir = 'angle_ndt'
