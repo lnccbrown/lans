@@ -12,7 +12,7 @@ class Config(object):
 
 	# select dataset
 	#self.angle_initialize()
-	self.race_model_4_initialize()
+	self.race_model_5_initialize()
 
 	self.train_tfrecords = self.dataset_dir+'_train.tfrecords'
 	self.val_tfrecords = self.dataset_dir+'_val.tfrecords'
@@ -35,6 +35,8 @@ class Config(object):
 	self.print_iters = 250
 	# how often do you want to validate?
 	self.val_iters = 1000
+
+	self.inference_dataset = '../data/angle_ndt_base_simulations_1.pickle'
 
     def angle_initialize(self):
 	self.dataset_dir = 'angle_ndt'

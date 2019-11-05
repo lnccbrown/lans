@@ -23,7 +23,7 @@ tf.logging.set_verbosity(tf.logging.ERROR)
 class Infer:
     def __init__(self, config):
 	self.cfg = config
-	self.target = pickle.load(open('../data/angle_ndt_base_simulations_1.pickle','rb'))[0][0].reshape((-1,))
+	self.target = pickle.load(open(self.cfg.inference_dataset,'rb'))[0][0].reshape((-1,))
 	self.inp = tf.placeholder(tf.float32, self.cfg.test_param_dims)
 	self.initialized = False
 	with tf.device('/gpu:0'):
@@ -41,16 +41,16 @@ class Infer:
     def __contains__(self, item):
 	return hasattr(self, item)
 
-    def klDivergence(self, x, y):
-	return np.sum(x * np.log(1e-30 + x/y))
+    def klDivergence(self, x, y, eps1=1e-7, eps2=1e-30):
+	return np.sum(x * np.log(eps2 + x/(y+eps1)))
 
     def objectivefn(self, params):
 	if self.initialized == False:
 	    self.sess = tf.Session(config=self.gpuconfig)
-	    ckpts = '/media/data_cifs/lakshmi/projectABC/models/cnn-v0/mlp_cnn_angle_1404250.ckpt-1404250'
+	    ckpts = tf.train.latest_checkpoint(self.cfg.model_output)
 	    self.saver.restore(self.sess, ckpts)
 	    self.initialized = True
-	pred_hist = self.sess.run(self.model.output, feed_dict={self.inp:params.reshape(1,1,5,1)})
+	pred_hist = self.sess.run(self.model.output, feed_dict={self.inp:params.reshape(self.cfg.test_param_dims)})
 	return self.klDivergence(pred_hist, self.target)
 
 def model_inference(simdata):
@@ -64,7 +64,7 @@ def model_inference(simdata):
 if __name__ == '__main__':
     n_workers = 25
     workers = Pool(n_workers)
-    simulated_data = pickle.load(open('../data/angle_ndt_base_simulations_1.pickle','rb'))
+    simulated_data = pickle.load(open(config.Config().inference_dataset,'rb'))
     simulated_data = simulated_data[0][:100]
     nsamples = simulated_data.shape[0]
     
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     
     # plot the results
     rec_params = np.array(rec_params)
-    GT = pickle.load(open('../data/angle_ndt_base_simulations_1.pickle','rb'))[1][:nsamples]
+    GT = pickle.load(open(config.Config().inference_dataset,'rb'))[1][:nsamples]
     cmap = mpl.cm.get_cmap('Paired')
     for k in range(GT.shape[1]):
 	plt.figure()

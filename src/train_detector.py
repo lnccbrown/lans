@@ -156,8 +156,8 @@ def calc_error(labels,predictions):
     assert (labels.shape == predictions.shape)
     return tf.reduce_mean(tf.sqrt(tf.reduce_sum(tf.square(labels-predictions), 1)),0)
 
-def kl_divergence(p, q): 
-    return tf.reduce_sum(p * tf.log(1e-30 + p/q))
+def kl_divergence(p, q, eps1=1e-7, eps2=1e-30): 
+    return tf.reduce_sum(p * tf.log(eps2 + p/(q+eps1)))
 
 def train_model(config):
 
@@ -281,17 +281,16 @@ def train_model(config):
 		    summary_str = sess.run(summary_op)
 		    train_writer.add_summary(summary_str, step)
 		    print("\t val loss = {}, time_elapsed = {}s".format(v_loss, time.time() - val_forward_pass_time))
-		    '''
+		    
 		    for kk in range(1):
-			X = v_res[kk].reshape(-1,2); 
-			plt.plot(X[:,0],color='r',alpha=0.5); 
-			plt.plot(v_labels[kk][:,0],'-.r',alpha=0.5);
-			plt.legend(['Model','Groundtruth']) 
-			plt.plot(X[:,1],color='b',alpha=0.5); 
-			plt.plot(v_labels[kk][:,1],'-.b',alpha=0.5); 
+			X = v_res[kk].reshape(-1,config.output_hist_dims[-1]); 
+			plt.plot(X,color='r',alpha=0.5, label='Predictions'); 
+			plt.plot(v_labels[kk],'g',alpha=0.5, label='Data');
+			plt.legend() 
+			#plt.plot(X[:,1],color='b',alpha=0.5); 
+			#plt.plot(v_labels[kk][:,1],'-.b',alpha=0.5); 
 			plt.pause(1);
 			plt.clf()
-		    '''
         except tf.errors.OutOfRangeError:
             print("Finished training for %d epochs" % config.epochs)
         finally:
