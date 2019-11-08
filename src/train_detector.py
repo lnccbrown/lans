@@ -159,6 +159,9 @@ def calc_error(labels,predictions):
 def kl_divergence(p, q, eps1=1e-7, eps2=1e-30): 
     return tf.reduce_sum(p * tf.log(eps2 + p/(q+eps1)))
 
+def kl_divergence_test(p, q, eps1=1e-7, eps2=1e-30):
+    return p * tf.log(eps2 + p/(q + eps1))
+
 def train_model(config):
 
     train_files = os.path.join(
@@ -299,21 +302,26 @@ def train_model(config):
             coord.join(threads)
 
 def test_model_eval(config):
-    test_data = os.path.join(config.tfrecord_dir, config.test_tfrecords)
-    with tf.device('/cpu:0'):
-        test_images, test_labels = inputs(tfrecord_file=test_data,
-                                            num_epochs=None,
-                                            image_target_size=config.image_target_size,
-                                            label_shape=config.num_classes,
-                                            batch_size=config.test_batch,
-                                            augmentation=False)
+    test_files = os.path.join(
+			config.base_dir,
+			config.tfrecord_dir,
+			config.test_tfrecords)
 
+    errors = []
+
+    with tf.device('/cpu:0'): 
+	test_data, test_labels = inputs(
+					tfrecord_file=test_files,
+					num_epochs=1,
+					batch_size=config.test_batch,
+					target_data_dims=config.param_dims,
+					target_label_dims=config.output_hist_dims)
     with tf.device('/gpu:0'):
         with tf.variable_scope("model") as scope:
             model = cnn_model_struct()
-            model.build(test_images,config.num_classes,train_mode=False)
-            results = tf.argmax(model.output, 1)
-            error = tf.reduce_mean(tf.cast(tf.equal(results, tf.cast(test_labels, tf.int64)), tf.float32))
+            model.build(test_data, config.param_dims[1:], config.output_hist_dims[1:],train_mode=False)
+            y_conv = model.output
+            error = kl_divergence_test(y_conv, tf.reshape(test_labels,[-1,np.prod(config.output_hist_dims[1:])]))
 
         gpuconfig = tf.ConfigProto()
         gpuconfig.gpu_options.allow_growth = True
@@ -321,8 +329,8 @@ def test_model_eval(config):
         saver = tf.train.Saver()
 
         with tf.Session(config=gpuconfig) as sess:
-            #init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
-            #sess.run(init_op)
+            init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
+            sess.run(init_op)
             coord = tf.train.Coordinator()
             threads = tf.train.start_queue_runners(coord=coord)
             step=0
@@ -331,42 +339,12 @@ def test_model_eval(config):
                     # load the model here
                     ckpts=tf.train.latest_checkpoint(config.model_output)
                     saver.restore(sess,ckpts)
-                    ims, labs, probs, err, res = sess.run([test_images,test_labels,model.output,error,results])
-                    import ipdb; ipdb.set_trace();
+                    _, _, err = sess.run([test_data, test_labels, error])
+		    batch_err = np.sum(err, axis=1)
+		    errors.append(batch_err)
             except tf.errors.OutOfRangeError:
                 print('Epoch limit reached!')
             finally:
                 coord.request_stop()
             coord.join(threads)
-
-# def get_model_predictions(config,patches):
-#     input = tf.placeholder(tf.float32, [None,config.image_target_size[0],config.image_target_size[1],config.image_target_size[2]], name='ip_placeholder')
-#     with tf.device('/gpu:0'):
-#         with tf.variable_scope("model") as scope:
-#             model = cnn_model_struct()
-#             model.build(input,config.num_classes,train_mode=False)
-#
-#         gpuconfig = tf.ConfigProto()
-#         gpuconfig.gpu_options.allow_growth = True
-#         gpuconfig.allow_soft_placement = True
-#         saver = tf.train.Saver()
-#
-#         with tf.Session(config=gpuconfig) as sess:
-#             #init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
-#             #sess.run(init_op)
-#             #coord = tf.train.Coordinator()
-#             #threads = tf.train.start_queue_runners(coord=coord)
-#             step=0
-#             try:
-#                 #while not coord.should_stop():
-#                     # load the model here
-#                     ckpts=tf.train.latest_checkpoint(config.model_output)
-#                     saver.restore(sess,ckpts)
-#                     probs = sess.run(model.output,feed_dict={input:patches})
-#             except tf.errors.OutOfRangeError:
-#                 print('Epoch limit reached!')
-#             finally:
-#                 #coord.request_stop()
-#                 print ('done')
-#             #coord.join(threads)
-#     return probs
+    import ipdb; ipdb.set_trace()

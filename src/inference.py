@@ -62,18 +62,21 @@ class Infer:
 def model_inference(simdata):
     cfg = config.Config()
     inference_class = Infer(config=cfg)
-    bounds = []
-    for k in range(np.prod(cfg.test_param_dims[-2:])):
-        bounds.append((-2,2))
+    #bounds = []
+    #for k in range(np.prod(cfg.test_param_dims[-2:])):
+    #    bounds.append((-2,2))
+    bounds = cfg.bounds
     inference_class.target = simdata.reshape((-1,))
     output = differential_evolution(inference_class.objectivefn,bounds)
+    inference_class.sess.close()
     return output.x
 
 if __name__ == '__main__':
     cfg = config.Config()
-    n_workers = 25
+    n_workers = 30
+    workers = Pool(n_workers)
     for infdata in cfg.inference_dataset:
-        workers = Pool(n_workers)
+        #workers = Pool(n_workers)
         simulated_data = pickle.load(open(infdata,'rb'))
         simulated_data = simulated_data[0]
         nsamples = simulated_data.shape[0]    
