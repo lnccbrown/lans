@@ -342,9 +342,16 @@ def test_model_eval(config):
                     _, _, err = sess.run([test_data, test_labels, error])
 		    batch_err = np.sum(err, axis=1)
 		    errors.append(batch_err)
+		    print('{} batches complete..'.format(len(errors)))
             except tf.errors.OutOfRangeError:
                 print('Epoch limit reached!')
             finally:
                 coord.request_stop()
             coord.join(threads)
-    import ipdb; ipdb.set_trace()
+    
+    err_vals = np.array(errors).reshape((-1,))
+    plt.hist(err_vals, bins=1000)
+    plt.title('Model: {}, min error={}, max error={}'.format(config.model_name,np.min(err_vals), np.max(err_vals)))
+    #import ipdb; ipdb.set_trace()
+    plt.savefig(os.path.join(config.results_dir, '{}_eval.png'.format(config.model_name)), dpi=300)
+    plt.close()
