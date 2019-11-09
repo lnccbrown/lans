@@ -13,6 +13,7 @@ import numpy as np
 import tqdm, time
 import matplotlib.pyplot as plt
 import math
+from textwrap import wrap
 
 class cnn_model_struct:
     def __init__(self, trainable=True):
@@ -308,6 +309,7 @@ def test_model_eval(config):
 			config.test_tfrecords)
 
     errors = []
+    data, labels, preds = [], [], []
 
     with tf.device('/cpu:0'): 
 	test_data, test_labels = inputs(
@@ -339,9 +341,12 @@ def test_model_eval(config):
                     # load the model here
                     ckpts=tf.train.latest_checkpoint(config.model_output)
                     saver.restore(sess,ckpts)
-                    _, _, err = sess.run([test_data, test_labels, error])
+                    ip , op, pred, err = sess.run([test_data, test_labels, y_conv, error])
 		    batch_err = np.sum(err, axis=1)
 		    errors.append(batch_err)
+		    data.append(ip)
+		    labels.append(op)
+		    preds.append(pred)
 		    print('{} batches complete..'.format(len(errors)))
             except tf.errors.OutOfRangeError:
                 print('Epoch limit reached!')
@@ -351,7 +356,35 @@ def test_model_eval(config):
     
     err_vals = np.array(errors).reshape((-1,))
     plt.hist(err_vals, bins=1000)
-    plt.title('Model: {}, min error={}, max error={}'.format(config.model_name,np.min(err_vals), np.max(err_vals)))
+    plt.title('Model: %s, min error=%0.3f, max error=%0.3f'%(config.model_name,np.min(err_vals), np.max(err_vals)), fontsize=12)
+    plt.gca().tick_params(axis='both', which='major', labelsize=6)
+    plt.gca().tick_params(axis='both', which='minor', labelsize=6)
     #import ipdb; ipdb.set_trace()
     plt.savefig(os.path.join(config.results_dir, '{}_eval.png'.format(config.model_name)), dpi=300)
+    plt.close()
+
+    inp_data = np.array(data)
+    inp_data = inp_data.reshape((inp_data.shape[0]*inp_data.shape[1],inp_data.shape[2],inp_data.shape[3]))
+    inp_labs = np.array(labels)
+    inp_labs = inp_labs.reshape((inp_labs.shape[0]*inp_labs.shape[1],inp_labs.shape[2],inp_labs.shape[3]))
+    idx = np.argsort(err_vals)
+    net_preds = np.array(preds)
+    net_preds = net_preds.reshape((net_preds.shape[0]*net_preds.shape[1],net_preds.shape[2]))
+    net_preds = net_preds.reshape(inp_labs.shape)
+
+    # lets draw a 3x3 grid with
+    fig, ax = plt.subplots(3,3)
+    for k in range(9):
+	r, c = int(k/3), k%3
+	cur_idx = idx[-1 * (k+1)]
+	parameters = np.around(inp_data[cur_idx].flatten(),decimals=2)
+	err = err_vals[cur_idx]
+	ax[r,c].plot(inp_labs[cur_idx],'r',alpha=0.5)
+	ax[r,c].plot(net_preds[cur_idx],'-.g',alpha=0.5)
+        mystr = 'err=%0.2f'%(err)
+	ax[r,c].text(0.9,.9, "\n".join(wrap('{}, params:{}'.format(mystr, parameters),30)), fontsize=6, horizontalalignment='right', verticalalignment='center', transform=ax[r,c].transAxes)
+        #plt.show() 
+        ax[r,c].tick_params(axis='both', which='major', labelsize=6)
+        ax[r,c].tick_params(axis='both', which='minor', labelsize=6)
+    plt.savefig(os.path.join(config.results_dir, '{}_debug.png'.format(config.model_name)),dpi=300)
     plt.close()

@@ -12,8 +12,8 @@ class Config(object):
 	self.summary_dir = 'summaries'
 
 	# select dataset
-	self.ornstein_initialize()
-	self.inference_dataset = glob.glob('../data/ornstein/parameter_recovery/*')
+	self.race_model_6_initialize()
+	self.inference_dataset = glob.glob('../data/angle/parameter_recovery/*')
 
 	self.train_tfrecords = self.dataset_dir+'_train.tfrecords'
 	self.val_tfrecords = self.dataset_dir+'_val.tfrecords'
@@ -89,12 +89,28 @@ class Config(object):
 	self.test_param_dims = [1, 1, 8, 1]
 	self.output_hist_dims = [None, 1, 256, 3]
 
+    def lca_3_initialize(self):
+	self.model_name = 'lca_3'
+	self.dataset_dir = 'lca_3'
+	self.dataset = 'lca_base*'
+	self.param_dims = [None, 1, 10, 1]
+	self.test_param_dims = [1, 1, 10, 1]
+	self.output_hist_dims = [None, 1, 256, 3]
+
     def race_model_4_initialize(self):
 	self.model_name = 'race_model_4'
 	self.dataset_dir = 'race_model_4'
 	self.dataset = 'race_model_base*'
 	self.param_dims = [None, 1, 10, 1]
 	self.test_param_dims = [1, 1, 10, 1]
+	self.output_hist_dims = [None, 1, 256, 4]
+
+    def lca_4_initialize(self):
+	self.model_name = 'lca_4'
+	self.dataset_dir = 'lca_4'
+	self.dataset = 'lca_base*'
+	self.param_dims = [None, 1, 12, 1]
+	self.test_param_dims = [1, 1, 12, 1]
 	self.output_hist_dims = [None, 1, 256, 4]
 
     def race_model_5_initialize(self):
@@ -105,11 +121,27 @@ class Config(object):
 	self.test_param_dims = [1, 1, 12, 1]
 	self.output_hist_dims = [None, 1, 256, 5]
 
+    def lca_5_initialize(self):
+	self.model_name = 'lca_5'
+	self.dataset_dir = 'lca_5'
+	self.dataset = 'lca_base*'
+	self.param_dims = [None, 1, 14, 1]
+	self.test_param_dims = [1, 1, 14, 1]
+	self.output_hist_dims = [None, 1, 256, 5]
+
     def race_model_6_initialize(self):
 	self.model_name = 'race_model_6'
 	self.dataset_dir = 'race_model_6'
 	self.dataset = 'race_model_base*'
 	self.param_dims = [None, 1, 14, 1]
 	self.test_param_dims = [1, 1, 14, 1]
+	self.output_hist_dims = [None, 1, 256, 6]
+
+    def lca_6_initialize(self):
+	self.model_name = 'lca_6'
+	self.dataset_dir = 'lca_6'
+	self.dataset = 'lca_base*'
+	self.param_dims = [None, 1, 16, 1]
+	self.test_param_dims = [1, 1, 16, 1]
 	self.output_hist_dims = [None, 1, 256, 6]
 
