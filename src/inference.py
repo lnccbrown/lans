@@ -15,6 +15,7 @@ import tqdm
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from multiprocessing import Pool
+import pickle
 
 plt.rcParams['font.size']= 6
 # just to prevent tensorflow from printing logs
@@ -73,7 +74,7 @@ def model_inference(simdata):
 
 if __name__ == '__main__':
     cfg = config.Config()
-    n_workers = 30
+    n_workers = 20
     workers = Pool(n_workers)
     for infdata in cfg.inference_dataset:
         #workers = Pool(n_workers)
@@ -87,6 +88,9 @@ if __name__ == '__main__':
         # plot the results
         rec_params = np.array(rec_params)
         GT = pickle.load(open(infdata,'rb'))[1][:nsamples]
+	result = {'pred':rec_params, 'gt':GT}
+	pickle.dump(result,open(os.path.join(cfg.results_dir,infdata.split('/')[-1].split('.')[0]+'_recovery.p'),'wb'))
+	'''
         cmap = mpl.cm.get_cmap('Paired')
         nplots = GT.shape[1]
         fig, ax = plt.subplots(int(np.ceil(nplots/3.)), 3)
@@ -98,3 +102,4 @@ if __name__ == '__main__':
         plt.savefig(os.path.join(cfg.results_dir,infdata.split('/')[-1].split('.')[0]+'_recovery.png'), dpi=300, bbox_inches='tight')
         plt.close()
         #plt.show()
+	'''

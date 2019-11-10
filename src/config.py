@@ -12,8 +12,8 @@ class Config(object):
 	self.summary_dir = 'summaries'
 
 	# select dataset
-	self.race_model_6_initialize()
-	self.inference_dataset = glob.glob('../data/angle/parameter_recovery/*')
+	self.ddm_initialize()
+	self.inference_dataset = glob.glob('../data/ddm/parameter_recovery/*')
 
 	self.train_tfrecords = self.dataset_dir+'_train.tfrecords'
 	self.val_tfrecords = self.dataset_dir+'_val.tfrecords'
@@ -53,7 +53,7 @@ class Config(object):
 	self.param_dims = [None, 1, 4, 1]
 	self.test_param_dims = [1, 1, 4, 1]
 	self.output_hist_dims = [None, 1, 256, 2]
-	#self.bounds = 
+	self.bounds = [(-2.0, 2.0), (0.5, 1.5), (0.3, 0.7), (0.0, 1.0)]
 
     def weibull_initialize(self):
 	self.model_name = 'weibull'
