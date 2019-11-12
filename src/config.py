@@ -29,8 +29,8 @@ class Config(object):
 
         # Model hyperparameters
         self.epochs = 30
-        self.train_batch = 1024
-        self.val_batch= 1
+        self.train_batch = 64
+        self.val_batch= 128
         self.test_batch = 1000
 	# how often should the training stats be printed?
 	self.print_iters = 250

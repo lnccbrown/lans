@@ -59,27 +59,87 @@ class cnn_reverse_model:
 	if verbose:
             print(self.h_conv3.get_shape())
 
-        self.fc1 = self.fc_layer(self.h_conv3, self.get_size(self.h_conv3), 1024, 'fc1')
+        self.fc1 = self.fc_layer(self.h_conv3, self.get_size(self.h_conv3), 256, 'fc1')
 	if verbose:
             print(self.fc1.get_shape())
 
-        self.fc2 = self.fc_layer(self.fc1, self.get_size(self.fc1), 512, 'fc2')
+        #self.fc2 = self.fc_layer(self.fc1, self.get_size(self.fc1), 512, 'fc2')
+	#if verbose:
+        #    print(self.fc2.get_shape())
+
+        self.fc2 = self.fc_layer(self.fc1, self.get_size(self.fc1), 128, 'fc2')
 	if verbose:
             print(self.fc2.get_shape())
 
-        self.fc3 = self.fc_layer(self.fc2, self.get_size(self.fc2), 128, 'fc3')
-	if verbose:
-            print(self.fc3.get_shape())
+        #self.fc4 = self.fc_layer(self.fc3, self.get_size(self.fc3), 64, 'fc4')
+	#if verbose:
+        #    print(self.fc4.get_shape())
 
-        self.fc4 = self.fc_layer(self.fc3, self.get_size(self.fc3), 64, 'fc4')
-	if verbose:
-            print(self.fc4.get_shape())
-
-        self.final_layer = self.fc_layer(self.fc4, self.get_size(self.fc4), np.prod(output_shape)*2, 'final_layer')
-        #self.final_layer = tf.nn.softmax(self.final_layer)
+	nparams = np.prod(output_shape)
+        self.final_layer = self.fc_layer(self.fc2, self.get_size(self.fc2), nparams, 'final_layer') # *2
+        #self.final_layer = tf.concat([self.final_layer[:, :nparams], tf.nn.softplus(self.final_layer[:, nparams:])], 1)
         self.output = tf.identity(self.final_layer,name='output')
 	if verbose:
             print(self.output.get_shape())
+
+
+        def build(self, input_data, input_shape, output_shape, train_mode=None, verbose=True):
+	    if verbose:
+            print ("Building the network...")
+        network_input = tf.identity(input_data, name='input')
+        with tf.name_scope('reshape'):
+            x_data = tf.reshape(network_input, [-1, input_shape[0], input_shape[1], input_shape[2]])
+ 
+        # conv layer 1
+        with tf.variable_scope('conv1'):
+            self.W_conv1 = self.weight_variable([1, 5, input_shape[2], 8],var_name='wconv1')
+            self.b_conv1 = self.bias_variable([8],var_name='bconv1')
+            self.norm1 = tf.layers.batch_normalization(self.conv2d(x_data, self.W_conv1,stride=[1,1,1,1]) + self.b_conv1,scale=True,center=True,training=train_mode)
+            self.h_conv1 = tf.nn.leaky_relu(self.norm1, alpha=0.1)
+	if verbose:
+            print(self.h_conv1.get_shape())
+
+        # conv layer 2
+        with tf.variable_scope('conv2'):
+            self.W_conv2 = self.weight_variable([1, 5, 8, 16],var_name='wconv2')
+            self.b_conv2 = self.bias_variable([16],var_name='bconv2')
+            self.norm2 = tf.layers.batch_normalization(self.conv2d(self.h_conv1, self.W_conv2, stride=[1, 2, 2, 1]) + self.b_conv2,scale=True,center=True,training=train_mode)
+            self.h_conv2 = tf.nn.leaky_relu(self.norm2, alpha=0.1)
+	if verbose:
+            print(self.h_conv2.get_shape())
+
+        # conv layer 3
+        with tf.variable_scope('conv3'):
+            self.W_conv3 = self.weight_variable([1, 5, 16, 32],var_name='wconv3')
+            self.b_conv3 = self.bias_variable([32],var_name='bconv3')
+            self.norm3 = tf.layers.batch_normalization(self.conv2d(self.h_conv2, self.W_conv3, stride=[1, 2, 2, 1]) + self.b_conv3, scale=True,center=True,training=train_mode)
+            self.h_conv3 = tf.nn.leaky_relu(self.norm3,alpha=0.1)
+	if verbose:
+            print(self.h_conv3.get_shape())
+
+        self.fc1 = self.fc_layer(self.h_conv3, self.get_size(self.h_conv3), 256, 'fc1')
+	if verbose:
+            print(self.fc1.get_shape())
+
+        #self.fc2 = self.fc_layer(self.fc1, self.get_size(self.fc1), 512, 'fc2')
+	#if verbose:
+        #    print(self.fc2.get_shape())
+
+        self.fc2 = self.fc_layer(self.fc1, self.get_size(self.fc1), 128, 'fc2')
+	if verbose:
+            print(self.fc2.get_shape())
+
+        #self.fc4 = self.fc_layer(self.fc3, self.get_size(self.fc3), 64, 'fc4')
+	#if verbose:
+        #    print(self.fc4.get_shape())
+
+	nparams = np.prod(output_shape)
+        self.final_layer = self.fc_layer(self.fc2, self.get_size(self.fc2), nparams, 'final_layer') # *2
+        #self.final_layer = tf.concat([self.final_layer[:, :nparams], tf.nn.softplus(self.final_layer[:, nparams:])], 1)
+        self.output = tf.identity(self.final_layer,name='output')
+	if verbose:
+            print(self.output.get_shape())
+
 
     def conv2d(self, x, W, stride=[1,1,1,1]):
         """conv2d returns a 2d convolution layer with full stride."""
@@ -160,9 +220,11 @@ def kl_divergence_test(p, q, eps1=1e-7, eps2=1e-30):
     return p * tf.log(eps2 + p/(q + eps1))
 
 def heteroskedastic_loss(p, q, nparams):
-    param_est = p[:,:nparams]
-    log_var = tf.log(p[:, nparams:])
-    return tf.nn.l2_loss(param_est - q)*tf.exp(-1*log_var) + log_var  
+    #param_est = p[:,:nparams]
+    #var = p[:, nparams:]
+    #diff_tensor = (param_est - q) ** 2
+    #return tf.reduce_sum( diff_tensor/var + tf.log(var) )
+    return tf.nn.l2_loss(p-q)
 
 def train_reverse_model(config):
 
@@ -188,7 +250,6 @@ def train_reverse_model(config):
 					batch_size=config.val_batch,
 					target_data_dims=config.param_dims,
 					target_label_dims=config.output_hist_dims)
-    import ipdb; ipdb.set_trace()
     with tf.device('/gpu:0'):
         with tf.variable_scope("model") as scope:
             print ("creating the model")
@@ -237,9 +298,8 @@ def train_reverse_model(config):
         try:
             while not coord.should_stop():
                 # train for a step
-                _, loss, softmax_outputs, tr_data, tr_labels = sess.run([train_step, kl_divergence_loss, y_conv, train_data, train_labels])
+                _, loss, outputs, tr_data, tr_labels = sess.run([train_step, hke_loss, y_conv, train_data, train_labels])
                 step+=1
-                
 		if step % config.print_iters == 0:
 		    finish = time.time()
                     print("step={}, loss={}, time_elapsed={} s/step".format(step,loss,(finish-start)/float(config.print_iters)))
@@ -256,35 +316,34 @@ def train_reverse_model(config):
 		    summary_str = sess.run(summary_op)
 		    train_writer.add_summary(summary_str, step)
 		    print("\t val loss = {}, time_elapsed = {}s".format(v_loss, time.time() - val_forward_pass_time))
-		    '''
-		    for kk in range(1):
-			X = v_res[kk].reshape(-1,config.output_hist_dims[-1]); 
-			plt.plot(X,color='r',alpha=0.5, label='Predictions'); 
-			plt.plot(v_labels[kk],'g',alpha=0.5, label='Data');
-			plt.legend() 
-			#plt.plot(X[:,1],color='b',alpha=0.5); 
-			#plt.plot(v_labels[kk][:,1],'-.b',alpha=0.5); 
-			plt.pause(1);
-			plt.clf()
-		    '''
+		    
+		    nparams = np.prod(config.param_dims[1:])
+		    color_v = ['r', 'g', 'b', 'k']
+		    for k in range(nparams): 
+		        plt.scatter(v_labels[:, k], v_res[:, k], c = color_v[k], alpha=0.5); 
+		    #plt.plot(v_labels[kk],'g',alpha=0.5, label='Data');
+		    #plt.legend() 
+		    plt.pause(1);
+		    plt.clf()
+		    
         except tf.errors.OutOfRangeError:
             print("Finished training for %d epochs" % config.epochs)
         finally:
             coord.request_stop()
             coord.join(threads)
 
-'''
-def test_model_eval(config):
+
+def test_rev_model_eval(config):
     test_files = os.path.join(
 			config.base_dir,
 			config.tfrecord_dir,
-			config.test_tfrecords)
+			config.train_tfrecords)
 
     errors = []
     data, labels, preds = [], [], []
 
     with tf.device('/cpu:0'): 
-	test_data, test_labels = inputs(
+	test_labels, test_data = inputs(
 					tfrecord_file=test_files,
 					num_epochs=1,
 					batch_size=config.test_batch,
@@ -292,10 +351,10 @@ def test_model_eval(config):
 					target_label_dims=config.output_hist_dims)
     with tf.device('/gpu:0'):
         with tf.variable_scope("model") as scope:
-            model = cnn_model_struct()
-            model.build(test_data, config.param_dims[1:], config.output_hist_dims[1:],train_mode=False)
+            model = cnn_reverse_model()
+            model.build(test_data, config.output_hist_dims[1:], config.param_dims[1:], train_mode=False)
             y_conv = model.output
-            error = kl_divergence_test(y_conv, tf.reshape(test_labels,[-1,np.prod(config.output_hist_dims[1:])]))
+            error = heteroskedastic_loss(y_conv, tf.reshape(test_labels, [-1,np.prod(config.param_dims[1:])]), np.prod(config.param_dims[1:]))
 
         gpuconfig = tf.ConfigProto()
         gpuconfig.gpu_options.allow_growth = True
@@ -314,6 +373,7 @@ def test_model_eval(config):
                     ckpts=tf.train.latest_checkpoint(config.model_output)
                     saver.restore(sess,ckpts)
                     ip , op, pred, err = sess.run([test_data, test_labels, y_conv, error])
+		    import ipdb; ipdb.set_trace()
 		    batch_err = np.sum(err, axis=1)
 		    errors.append(batch_err)
 		    data.append(ip)
@@ -325,7 +385,8 @@ def test_model_eval(config):
             finally:
                 coord.request_stop()
             coord.join(threads)
-    
+    import ipdb; ipdb.set_trace()
+    '''
     err_vals = np.array(errors).reshape((-1,))
     plt.hist(err_vals, bins=1000)
     plt.title('Model: %s, min error=%0.3f, max error=%0.3f'%(config.model_name,np.min(err_vals), np.max(err_vals)), fontsize=12)
@@ -360,4 +421,4 @@ def test_model_eval(config):
         ax[r,c].tick_params(axis='both', which='minor', labelsize=6)
     plt.savefig(os.path.join(config.results_dir, '{}_debug.png'.format(config.model_name)),dpi=300)
     plt.close()
-'''
+    '''
