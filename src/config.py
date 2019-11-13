@@ -20,6 +20,7 @@ class Config(object):
 	self.test_tfrecords = self.dataset_dir+'_test.tfrecords'
 
         # Data configuration
+	self.full_cov_matrix = True
         self.results_dir = '/media/data_cifs/lakshmi/projectABC/results/'
         self.model_output = os.path.join(self.base_dir,
 					'models',
@@ -27,11 +28,14 @@ class Config(object):
 	
 	self.data_prop = {'train':0.9, 'val':0.05, 'test':0.05}
 
+	self.min_param_values = np.array([x[0] for x in self.bounds])
+	self.param_range = np.array([x[1] - x[0] for x in self.bounds])
+
         # Model hyperparameters
         self.epochs = 30
-        self.train_batch = 64
-        self.val_batch= 128
-        self.test_batch = 1000
+        self.train_batch = 128
+        self.val_batch = 64
+        self.test_batch = 128
 	# how often should the training stats be printed?
 	self.print_iters = 250
 	# how often do you want to validate?

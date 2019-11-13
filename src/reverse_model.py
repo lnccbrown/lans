@@ -25,7 +25,7 @@ class cnn_reverse_model:
     def get_size(self, input_data):
         return np.prod([int(x) for x in input_data.get_shape()[1:]])
 
-    def build(self, input_data, input_shape, output_shape, train_mode=None, verbose=True):
+    def build(self, input_data, input_shape, output_shape, train_mode=None, verbose=True, full_cov=False):
 	if verbose:
             print ("Building the network...")
         network_input = tf.identity(input_data, name='input')
@@ -36,7 +36,8 @@ class cnn_reverse_model:
         with tf.variable_scope('conv1'):
             self.W_conv1 = self.weight_variable([1, 5, input_shape[2], 8],var_name='wconv1')
             self.b_conv1 = self.bias_variable([8],var_name='bconv1')
-            self.norm1 = tf.layers.batch_normalization(self.conv2d(x_data, self.W_conv1,stride=[1,1,1,1]) + self.b_conv1,scale=True,center=True,training=train_mode)
+            #self.norm1 = tf.layers.batch_normalization(self.conv2d(x_data, self.W_conv1,stride=[1,1,1,1]) + self.b_conv1,scale=True,center=True,training=train_mode,name='batchnorm1')
+            self.norm1 = self.conv2d(x_data, self.W_conv1,stride=[1,1,1,1]) + self.b_conv1
             self.h_conv1 = tf.nn.leaky_relu(self.norm1, alpha=0.1)
 	if verbose:
             print(self.h_conv1.get_shape())
@@ -45,7 +46,8 @@ class cnn_reverse_model:
         with tf.variable_scope('conv2'):
             self.W_conv2 = self.weight_variable([1, 5, 8, 16],var_name='wconv2')
             self.b_conv2 = self.bias_variable([16],var_name='bconv2')
-            self.norm2 = tf.layers.batch_normalization(self.conv2d(self.h_conv1, self.W_conv2, stride=[1, 2, 2, 1]) + self.b_conv2,scale=True,center=True,training=train_mode)
+            #self.norm2 = tf.layers.batch_normalization(self.conv2d(self.h_conv1, self.W_conv2, stride=[1, 2, 2, 1]) + self.b_conv2,scale=True,center=True,training=train_mode,name='batchnorm2')
+            self.norm2 = self.conv2d(self.h_conv1, self.W_conv2, stride=[1, 2, 2, 1]) + self.b_conv2
             self.h_conv2 = tf.nn.leaky_relu(self.norm2, alpha=0.1)
 	if verbose:
             print(self.h_conv2.get_shape())
@@ -54,7 +56,8 @@ class cnn_reverse_model:
         with tf.variable_scope('conv3'):
             self.W_conv3 = self.weight_variable([1, 5, 16, 32],var_name='wconv3')
             self.b_conv3 = self.bias_variable([32],var_name='bconv3')
-            self.norm3 = tf.layers.batch_normalization(self.conv2d(self.h_conv2, self.W_conv3, stride=[1, 2, 2, 1]) + self.b_conv3, scale=True,center=True,training=train_mode)
+            #self.norm3 = tf.layers.batch_normalization(self.conv2d(self.h_conv2, self.W_conv3, stride=[1, 2, 2, 1]) + self.b_conv3, scale=True,center=True,training=train_mode,name='batchnorm3')
+            self.norm3 = self.conv2d(self.h_conv2, self.W_conv3, stride=[1, 2, 2, 1]) + self.b_conv3
             self.h_conv3 = tf.nn.leaky_relu(self.norm3,alpha=0.1)
 	if verbose:
             print(self.h_conv3.get_shape())
@@ -76,70 +79,15 @@ class cnn_reverse_model:
         #    print(self.fc4.get_shape())
 
 	nparams = np.prod(output_shape)
-        self.final_layer = self.fc_layer(self.fc2, self.get_size(self.fc2), nparams, 'final_layer') # *2
-        #self.final_layer = tf.concat([self.final_layer[:, :nparams], tf.nn.softplus(self.final_layer[:, nparams:])], 1)
-        self.output = tf.identity(self.final_layer,name='output')
+	if full_cov:
+            self.final_layer = self.fc_layer(self.fc2, self.get_size(self.fc2), nparams + nparams ** 2, 'final_layer')
+	else:
+	    self.final_layer = self.fc_layer(self.fc2, self.get_size(self.fc2), nparams * 2, 'final_layer')
+            self.final_layer = tf.concat([self.final_layer[:, :nparams], tf.nn.softplus(self.final_layer[:, nparams:])], 1)
+
+	self.output = tf.identity(self.final_layer,name='output')
 	if verbose:
             print(self.output.get_shape())
-
-
-        def build(self, input_data, input_shape, output_shape, train_mode=None, verbose=True):
-	    if verbose:
-            print ("Building the network...")
-        network_input = tf.identity(input_data, name='input')
-        with tf.name_scope('reshape'):
-            x_data = tf.reshape(network_input, [-1, input_shape[0], input_shape[1], input_shape[2]])
- 
-        # conv layer 1
-        with tf.variable_scope('conv1'):
-            self.W_conv1 = self.weight_variable([1, 5, input_shape[2], 8],var_name='wconv1')
-            self.b_conv1 = self.bias_variable([8],var_name='bconv1')
-            self.norm1 = tf.layers.batch_normalization(self.conv2d(x_data, self.W_conv1,stride=[1,1,1,1]) + self.b_conv1,scale=True,center=True,training=train_mode)
-            self.h_conv1 = tf.nn.leaky_relu(self.norm1, alpha=0.1)
-	if verbose:
-            print(self.h_conv1.get_shape())
-
-        # conv layer 2
-        with tf.variable_scope('conv2'):
-            self.W_conv2 = self.weight_variable([1, 5, 8, 16],var_name='wconv2')
-            self.b_conv2 = self.bias_variable([16],var_name='bconv2')
-            self.norm2 = tf.layers.batch_normalization(self.conv2d(self.h_conv1, self.W_conv2, stride=[1, 2, 2, 1]) + self.b_conv2,scale=True,center=True,training=train_mode)
-            self.h_conv2 = tf.nn.leaky_relu(self.norm2, alpha=0.1)
-	if verbose:
-            print(self.h_conv2.get_shape())
-
-        # conv layer 3
-        with tf.variable_scope('conv3'):
-            self.W_conv3 = self.weight_variable([1, 5, 16, 32],var_name='wconv3')
-            self.b_conv3 = self.bias_variable([32],var_name='bconv3')
-            self.norm3 = tf.layers.batch_normalization(self.conv2d(self.h_conv2, self.W_conv3, stride=[1, 2, 2, 1]) + self.b_conv3, scale=True,center=True,training=train_mode)
-            self.h_conv3 = tf.nn.leaky_relu(self.norm3,alpha=0.1)
-	if verbose:
-            print(self.h_conv3.get_shape())
-
-        self.fc1 = self.fc_layer(self.h_conv3, self.get_size(self.h_conv3), 256, 'fc1')
-	if verbose:
-            print(self.fc1.get_shape())
-
-        #self.fc2 = self.fc_layer(self.fc1, self.get_size(self.fc1), 512, 'fc2')
-	#if verbose:
-        #    print(self.fc2.get_shape())
-
-        self.fc2 = self.fc_layer(self.fc1, self.get_size(self.fc1), 128, 'fc2')
-	if verbose:
-            print(self.fc2.get_shape())
-
-        #self.fc4 = self.fc_layer(self.fc3, self.get_size(self.fc3), 64, 'fc4')
-	#if verbose:
-        #    print(self.fc4.get_shape())
-
-	nparams = np.prod(output_shape)
-        self.final_layer = self.fc_layer(self.fc2, self.get_size(self.fc2), nparams, 'final_layer') # *2
-        #self.final_layer = tf.concat([self.final_layer[:, :nparams], tf.nn.softplus(self.final_layer[:, nparams:])], 1)
-        self.output = tf.identity(self.final_layer,name='output')
-	if verbose:
-            print(self.output.get_shape())
-
 
     def conv2d(self, x, W, stride=[1,1,1,1]):
         """conv2d returns a 2d convolution layer with full stride."""
@@ -208,23 +156,37 @@ class cnn_reverse_model:
 
         return var
 
-def calc_error(labels,predictions):
-    # note that here there are only 2 dimensions -- batch index and (u,v,d)
-    assert (labels.shape == predictions.shape)
-    return tf.reduce_mean(tf.sqrt(tf.reduce_sum(tf.square(labels-predictions), 1)),0)
-
-def kl_divergence(p, q, eps1=1e-7, eps2=1e-30): 
-    return tf.reduce_sum(p * tf.log(eps2 + p/(q+eps1)))
-
-def kl_divergence_test(p, q, eps1=1e-7, eps2=1e-30):
-    return p * tf.log(eps2 + p/(q + eps1))
-
+'''
+# assumes isotropicity
+'''
 def heteroskedastic_loss(p, q, nparams):
-    #param_est = p[:,:nparams]
-    #var = p[:, nparams:]
-    #diff_tensor = (param_est - q) ** 2
-    #return tf.reduce_sum( diff_tensor/var + tf.log(var) )
-    return tf.nn.l2_loss(p-q)
+    param_est = p[:,:nparams]
+    var = p[:, nparams:]
+    diff_tensor = (param_est - q) ** 2
+    return tf.reduce_sum( diff_tensor/var + tf.log(var) )
+
+'''
+# train the full covariance matrix instead
+'''
+def heteroskedastic_cov_loss(p, q, nparams, eps=10):
+    param_est = p[:, :nparams]
+    # reshape to a matrix
+    cov = tf.reshape(p[:,nparams:],[-1,nparams,nparams])
+    # extract the upper triangular matrix
+    cov_upper = tf.matrix_band_part(cov, 0, 0)
+    # enforce symmetry
+    cov_sym = 0.5 * (cov_upper + tf.linalg.transpose(cov_upper))
+    # determinant of covariance matrix
+    cov_det = tf.linalg.det(cov_sym)
+    # inverse of the covariance matrix
+    cov_inv = tf.linalg.inv(cov_sym)
+    # eigen values
+    cov_eig = tf.linalg.eigvalsh(cov_sym)
+    # diff
+    diff = tf.expand_dims(param_est - q, axis = -1)
+    term1 = tf.squeeze(tf.matmul(tf.matmul(tf.linalg.transpose(diff), cov_inv), diff))
+    loss = tf.reduce_sum( term1 + tf.log(1e-30 + tf.abs(cov_det)) - eps * tf.minimum(tf.reduce_min(cov_eig, axis=-1), 0))
+    return loss, cov_sym
 
 def train_reverse_model(config):
 
@@ -254,12 +216,19 @@ def train_reverse_model(config):
         with tf.variable_scope("model") as scope:
             print ("creating the model")
             model = cnn_reverse_model()
-            model.build(train_data, config.output_hist_dims[1:], config.param_dims[1:], train_mode=True)
+            model.build(train_data, config.output_hist_dims[1:], config.param_dims[1:], train_mode=True, full_cov=True)
             y_conv = model.output
+	    nparams = np.prod(config.param_dims[1:])
 
             # Define loss and optimizer
             with tf.name_scope('loss'):
-                hke_loss = heteroskedastic_loss(y_conv, tf.reshape(train_labels,[-1,np.prod(config.param_dims[1:])]), np.prod(config.param_dims[1:]))
+		labels = tf.reshape(train_labels, [-1, nparams])
+
+		#### depending on the config, use the appropriate loss
+		if config.full_cov_matrix:
+		    hke_loss, cov_sym = heteroskedastic_cov_loss(y_conv, labels, nparams)
+		else:
+                    hke_loss = heteroskedastic_loss(y_conv, labels, nparams)
 
             with tf.name_scope('adam_optimizer'):
                 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -272,9 +241,15 @@ def train_reverse_model(config):
             print("building a validation model")
 	    scope.reuse_variables()
             val_model = cnn_reverse_model()
-            val_model.build(val_data, config.output_hist_dims[1:], config.param_dims[1:], train_mode=False)
+            val_model.build(val_data, config.output_hist_dims[1:], config.param_dims[1:], train_mode=False, full_cov=True)
             val_res = val_model.output
-            val_loss =  heteroskedastic_loss(val_res, tf.reshape(val_labels, [-1,np.prod(config.param_dims[1:])]), np.prod(config.param_dims[1:]))
+	    norm_val_labels = tf.reshape(val_labels, [-1,nparams])
+            
+	    #### select loss function for the val model as well
+	    if config.full_cov_matrix:
+	        val_loss, _ = heteroskedastic_cov_loss(val_res, norm_val_labels, nparams)
+	    else:
+		val_loss =  heteroskedastic_loss(val_res, norm_val_labels, nparams)
 
             tf.summary.scalar("loss", hke_loss)
             summary_op = tf.summary.merge_all()
@@ -285,7 +260,7 @@ def train_reverse_model(config):
     gpuconfig.allow_soft_placement = True
 
     with tf.Session(config=gpuconfig) as sess:
-        train_writer = tf.summary.FileWriter(os.path.join(config.base_dir,config.summary_dir))
+        train_writer = tf.summary.FileWriter(os.path.join(config.base_dir,config.summary_dir,config.model_name))
         train_writer.add_graph(tf.get_default_graph())
 
         init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
@@ -298,7 +273,11 @@ def train_reverse_model(config):
         try:
             while not coord.should_stop():
                 # train for a step
-                _, loss, outputs, tr_data, tr_labels = sess.run([train_step, hke_loss, y_conv, train_data, train_labels])
+		if config.full_cov_matrix:
+                	_, loss, outputs, tr_data, tr_labels, norm_tr_labels, cov_mat = sess.run([train_step, hke_loss, y_conv, train_data, train_labels, labels, cov_sym])
+		else:
+                	_, loss, outputs, tr_data, tr_labels, norm_tr_labels = sess.run([train_step, hke_loss, y_conv, train_data, train_labels, labels])
+
                 step+=1
 		if step % config.print_iters == 0:
 		    finish = time.time()
@@ -308,10 +287,12 @@ def train_reverse_model(config):
                         config.model_output,
                         config.model_name+'_'+str(step)+'.ckpt'
                     ),global_step=step)
+		    if config.full_cov_matrix:
+		        print(cov_mat)
 
 		if step % config.val_iters == 0:
 		    val_forward_pass_time = time.time()
-		    v_data, v_labels, v_res, v_loss = sess.run([val_data, val_labels, val_res, val_loss])
+		    v_data, v_labels, norm_v_labels, v_res, v_loss = sess.run([val_data, val_labels, norm_val_labels, val_res, val_loss])
 
 		    summary_str = sess.run(summary_op)
 		    train_writer.add_summary(summary_str, step)
@@ -320,11 +301,12 @@ def train_reverse_model(config):
 		    nparams = np.prod(config.param_dims[1:])
 		    color_v = ['r', 'g', 'b', 'k']
 		    for k in range(nparams): 
-		        plt.scatter(v_labels[:, k], v_res[:, k], c = color_v[k], alpha=0.5); 
-		    #plt.plot(v_labels[kk],'g',alpha=0.5, label='Data');
-		    #plt.legend() 
+		        plt.scatter(norm_v_labels[:, k], v_res[:, k], c = color_v[k], alpha=0.5); 
+
 		    plt.pause(1);
 		    plt.clf()
+		    data_dump = {'predictions': outputs, 'labels': norm_tr_labels, 'cov':cov_mat}
+		    pickle.dump(data_dump, open( os.path.join(config.base_dir,config.summary_dir,config.model_name,'step%d.pickle'%step), 'wb'))
 		    
         except tf.errors.OutOfRangeError:
             print("Finished training for %d epochs" % config.epochs)
@@ -337,30 +319,39 @@ def test_rev_model_eval(config):
     test_files = os.path.join(
 			config.base_dir,
 			config.tfrecord_dir,
-			config.train_tfrecords)
+			config.test_tfrecords)
 
     errors = []
     data, labels, preds = [], [], []
 
     with tf.device('/cpu:0'): 
+	'''
 	test_labels, test_data = inputs(
 					tfrecord_file=test_files,
 					num_epochs=1,
 					batch_size=config.test_batch,
 					target_data_dims=config.param_dims,
 					target_label_dims=config.output_hist_dims)
+	'''
+	test_data = tf.placeholder(tf.float32, [1000, 1, 256, 2])
+	test_labels = tf.placeholder(tf.float32, [1000, 1, 4, 1])
+
     with tf.device('/gpu:0'):
         with tf.variable_scope("model") as scope:
             model = cnn_reverse_model()
             model.build(test_data, config.output_hist_dims[1:], config.param_dims[1:], train_mode=False)
             y_conv = model.output
-            error = heteroskedastic_loss(y_conv, tf.reshape(test_labels, [-1,np.prod(config.param_dims[1:])]), np.prod(config.param_dims[1:]))
+	    nparams = np.prod(config.param_dims[1:])
+	    labels = tf.reshape(test_labels, [-1, nparams])
+	    #labels = (labels - config.min_param_values)/config.param_range
+            error = heteroskedastic_loss(y_conv, labels, nparams)
 
         gpuconfig = tf.ConfigProto()
         gpuconfig.gpu_options.allow_growth = True
         gpuconfig.allow_soft_placement = True
         saver = tf.train.Saver()
 
+	X = pickle.load(open('../data/ddm/parameter_recovery/ddm_param_recovery_data_n_3000.pickle', 'rb'))
         with tf.Session(config=gpuconfig) as sess:
             init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
             sess.run(init_op)
@@ -372,7 +363,14 @@ def test_rev_model_eval(config):
                     # load the model here
                     ckpts=tf.train.latest_checkpoint(config.model_output)
                     saver.restore(sess,ckpts)
-                    ip , op, pred, err = sess.run([test_data, test_labels, y_conv, error])
+                    #ip , op, pred, err, norm_labels = sess.run([test_data, test_labels, y_conv, error, labels])
+		    pred, err, norm_labels = sess.run([y_conv,error,labels],feed_dict={test_data: np.expand_dims(X[0],axis=1),test_labels:np.expand_dims(np.expand_dims(X[1],axis=-1),axis=1)})
+	 	    plt.figure(); sc = plt.scatter(norm_labels[:,0], pred[:,0], c=pred[:,4], edgecolors='none', cmap='jet', alpha=0.5); plt.colorbar(sc);
+		    plt.figure(); sc = plt.scatter(norm_labels[:,1], pred[:,1], c=pred[:,5], edgecolors='none', cmap='jet', alpha=0.5); plt.colorbar(sc);
+		    plt.figure(); sc =plt.scatter(norm_labels[:,2], pred[:,2], c=pred[:,6], edgecolors='none', cmap='jet', alpha=0.5); plt.colorbar(sc);
+		    plt.figure(); sc = plt.scatter(norm_labels[:,3], pred[:,3], c=pred[:,7], edgecolors='none', cmap='jet', alpha=0.5); plt.colorbar(sc)
+		    plt.show()
+ 	
 		    import ipdb; ipdb.set_trace()
 		    batch_err = np.sum(err, axis=1)
 		    errors.append(batch_err)
