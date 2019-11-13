@@ -171,7 +171,7 @@ def heteroskedastic_loss(p, q, nparams):
 def heteroskedastic_cov_loss(p, q, nparams, eps=10):
     param_est = p[:, :nparams]
     # reshape to a matrix
-    cov = tf.reshape(p[:,nparams:],[-1,nparams,nparams])
+    cov = tf.nn.softplus(tf.reshape(p[:,nparams:],[-1,nparams,nparams]))
     # extract the upper triangular matrix
     cov_upper = tf.matrix_band_part(cov, 0, 0)
     # enforce symmetry
@@ -182,10 +182,12 @@ def heteroskedastic_cov_loss(p, q, nparams, eps=10):
     cov_inv = tf.linalg.inv(cov_sym)
     # eigen values
     cov_eig = tf.linalg.eigvalsh(cov_sym)
+
     # diff
     diff = tf.expand_dims(param_est - q, axis = -1)
     term1 = tf.squeeze(tf.matmul(tf.matmul(tf.linalg.transpose(diff), cov_inv), diff))
     loss = tf.reduce_sum( term1 + tf.log(1e-30 + tf.abs(cov_det)) - eps * tf.minimum(tf.reduce_min(cov_eig, axis=-1), 0))
+    #loss = tf.reduce_sum( term1 + tf.log(1e-30 + tf.abs(cov_det)) )
     return loss, cov_sym
 
 def train_reverse_model(config):
