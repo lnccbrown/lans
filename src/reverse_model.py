@@ -218,7 +218,7 @@ def train_reverse_model(config):
         with tf.variable_scope("model") as scope:
             print ("creating the model")
             model = cnn_reverse_model()
-            model.build(train_data, config.output_hist_dims[1:], config.param_dims[1:], train_mode=True, full_cov=True)
+            model.build(train_data, config.output_hist_dims[1:], config.param_dims[1:], train_mode=True, full_cov=config.full_cov_matrix)
             y_conv = model.output
 	    nparams = np.prod(config.param_dims[1:])
 
@@ -243,7 +243,7 @@ def train_reverse_model(config):
             print("building a validation model")
 	    scope.reuse_variables()
             val_model = cnn_reverse_model()
-            val_model.build(val_data, config.output_hist_dims[1:], config.param_dims[1:], train_mode=False, full_cov=True)
+            val_model.build(val_data, config.output_hist_dims[1:], config.param_dims[1:], train_mode=False, full_cov=config.full_cov_matrix)
             val_res = val_model.output
 	    norm_val_labels = tf.reshape(val_labels, [-1,nparams])
             
@@ -307,8 +307,10 @@ def train_reverse_model(config):
 
 		    plt.pause(1);
 		    plt.clf()
-		    data_dump = {'predictions': outputs, 'labels': norm_tr_labels, 'cov':cov_mat}
-		    pickle.dump(data_dump, open( os.path.join(config.base_dir,config.summary_dir,config.model_name,'step%d.pickle'%step), 'wb'))
+
+		    if config.full_cov_matrix:
+		        data_dump = {'predictions': outputs, 'labels': norm_tr_labels, 'cov':cov_mat}
+		        pickle.dump(data_dump, open( os.path.join(config.base_dir,config.summary_dir,config.model_name,'step%d.pickle'%step), 'wb'))
 		    
         except tf.errors.OutOfRangeError:
             print("Finished training for %d epochs" % config.epochs)

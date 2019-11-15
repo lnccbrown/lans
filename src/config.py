@@ -19,12 +19,18 @@ class Config(object):
 	self.val_tfrecords = self.dataset_dir+'_val.tfrecords'
 	self.test_tfrecords = self.dataset_dir+'_test.tfrecords'
 
+	"""
+	Specify whether or not to treat gaussian errors as isotropic
+	This only matters for the "reverse" model
+	"""
+	self.full_cov_matrix = False
+
         # Data configuration
-	self.full_cov_matrix = True
         self.results_dir = '/media/data_cifs/lakshmi/projectABC/results/'
+	self.model_suffix = 'full_cov' if self.full_cov_matrix else 'isotropic'
         self.model_output = os.path.join(self.base_dir,
 					'models',
-					self.model_name)
+					self.model_name+'_'+self.model_suffix)
 	
 	self.data_prop = {'train':0.9, 'val':0.05, 'test':0.05}
 
@@ -32,7 +38,7 @@ class Config(object):
 	self.param_range = np.array([x[1] - x[0] for x in self.bounds])
 
         # Model hyperparameters
-        self.epochs = 30
+        self.epochs = 15
         self.train_batch = 128
         self.val_batch = 64
         self.test_batch = 128
