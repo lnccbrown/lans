@@ -27,13 +27,13 @@ class ImportanceSampler:
 	self.forward_model_inpdims = [1] + self.cfg.param_dims[1:]
 	self.forward_input = tf.placeholder(tf.float32, self.forward_model_inpdims)
 	self.forward_initialized = False
-
 	with tf.device('/gpu:0'):
-	    with tf.variable_scope("model", reuse=tf.AUTO_REUSE) as scope:
+	    with tf.variable_scope("reversemodel", reuse=tf.AUTO_REUSE) as scope:
 		# build the inverse model
 		self.inv_model = cnn_reverse_model()
-		self.inv_model.build(self.inv_inp, self.cfg.output_hist_dims[1:], self.cfg.param_dims[1:], train_mode=False, verbose=False)
+		self.inv_model.build(self.inv_input, self.cfg.output_hist_dims[1:], self.cfg.param_dims[1:], train_mode=False, verbose=False)
 
+	    with tf.variable_scope("model", reuse=tf.AUTO_REUSE) as scope:
 		# build the forward model
 		self.forward_model = cnn_model_struct()
 		self.forward_model.build(self.forward_input, self.cfg.param_dims[1:], self.cfg.output_hist_dims[1:], train_mode=False, verbose=False)
@@ -55,58 +55,78 @@ class ImportanceSampler:
     def likelihood(self, x, y, eps=1e-7):
 	return np.sum(-np.log(x+eps)*y)
 
-    def objectivefn(self, params):
-	if self.initialized == False:
-	    self.sess = tf.Session(config=self.gpuconfig)
+    def getInitialProposal(self, dataset):
+	if self.inv_initialized == False:
+	    self.inv_sess = tf.Session(config=self.gpuconfig)
+	    ckpts = tf.train.latest_checkpoint(os.path.join(self.cfg.base_dir, 
+							'models',
+							'rev_'+self.cfg.model_name+'_'+cfg.model_suffix))
+	    self.saver.restore(self.inv_sess, ckpts)
+	    self.inv_initializer = True
+	params = self.inv_sess.run(self.inv_model.output, feed_dict={self.inv_input: dataset.reshape(self.inv_model_inpdims)})
+	nparams = np.prod(self.cfg.param_dims[1:])
+	
+	means = params[:nparams]
+	stds = params[nparams:]
+	return means, stds
+
+    def generateFromProposal(self, params):
+	if self.forward_initialized == False:
+	    self.forward_sess = tf.Session(config=self.gpuconfig)
 	    ckpts = tf.train.latest_checkpoint(self.cfg.model_output)
-	    self.saver.restore(self.sess, ckpts)
-	    self.initialized = True
-	pred_hist = self.sess.run(self.model.output, feed_dict={self.inp:params.reshape(self.cfg.test_param_dims)})
-	#return self.klDivergence(pred_hist, self.target)
-	return self.likelihood(pred_hist, self.target)
+	    self.saver.restore(self.forward_sess, ckpts)
+	    self.forward_initialized = True
 
-def eval_likelihood(x, mu_l, std_l, alpha_l):
-    n_components = alpha_l.shape[0]
-    n_dims = mu_l.shape[1]
-    target = np.zeros((x.shape[0],))
-    for a in range(n_components):
-        target += alpha_l[a] * stats.multivariate_normal.pdf(x, mean=mu_l[a], cov=std_l[a])
-    return target
+	pred_data = self.sess.run(self.forward_model.output, feed_dict={self.forward_inp:params.reshape(self.forward_model_inpdims)})
+	#return self.likelihood(pred_hist, self.target)
+	return pred_data
 
-def eval_proposal_by_component(x, mu_d, std_d):
-    target = stats.multivariate_normal.pdf(x, mean=mu_d, cov=std_d)
-    return target
+    '''
+    def eval_likelihood(x, mu_l, std_l, alpha_l):
+        n_components = alpha_l.shape[0]
+        n_dims = mu_l.shape[1]
+        target = np.zeros((x.shape[0],))
+        for a in range(n_components):
+            target += alpha_l[a] * stats.multivariate_normal.pdf(x, mean=mu_l[a], cov=std_l[a])
+        return target
 
-def gen_from_proposal(mu_p, std_p, alpha_p, n):
-    component_indices = np.random.choice(alpha_p.shape[0], # number of components
-		                         p = alpha_p, # component probabilities
+    def eval_proposal_by_component(x, mu_d, std_d):
+        target = stats.multivariate_normal.pdf(x, mean=mu_d, cov=std_d)
+        return target
+
+    def gen_from_proposal(mu_p, std_p, alpha_p, n):
+        component_indices = np.random.choice(alpha_p.shape[0], # number of components
+		                         p = alpha_p,          # component probabilities
 		     			 size = n,
 		     			 replace = True)
-    _, unique_counts = np.unique(component_indices, return_counts=True)
-    samples = np.array([])
-    for c in range(alpha_p.shape[0]):
-	if c >= unique_counts.shape[0]:
-	    continue
-	cur_samps = np.random.multivariate_normal(size = unique_counts[c], mean = mu_p[c], cov = std_p[c])
-	if c == 0:
-	    samples = cur_samps
-	else:
-            samples = np.concatenate([samples, cur_samps], axis=0)
-    return samples
+        _, unique_counts = np.unique(component_indices, return_counts=True)
+        samples = np.array([])
+        for c in range(alpha_p.shape[0]):
+            if c >= unique_counts.shape[0]:
+	        continue
+ 	    cur_samps = np.random.multivariate_normal(size = unique_counts[c], mean = mu_p[c], cov = std_p[c])
+	    if c == 0:
+	        samples = cur_samps
+	    else:
+                samples = np.concatenate([samples, cur_samps], axis=0)
+        return samples
+    '''
 
 def main():
-
     # let's choose the dataset for which we'll try to get posteriors
+    my_data = pickle.load(open('../data/ddm/parameter_recovery/ddm_param_recovery_data_n_3000.pickle', 'rb'))
+    data, params = my_data[0][0], my_data[1][0]
 
     # load in the configurations
     cfg = config.Config()
     # initialize the importance sampler
     i_sampler = ImportanceSampler(cfg)
-
+    os._exit(0)
     max_iters = 100
     tol = 1e-7
     N = 100000
 
+    '''
     # this is what we want to achieve
     alpha_l = np.array([0.5, 0.5])
     mu_l = np.array([[1., 0.], [5., 0.], [-3., -3]])
@@ -115,8 +135,11 @@ def main():
 		     [[.1, .0], [.0, .1]],
                      [[.1, .0], [.0, .1]]
 		])
+    '''
 
     # get an initial proposal from our inverse model
+    mu_p, std_p = i_sampler.getInitialProposal()
+    '''
     alpha_p = np.array([0.3, 0.2, 0.2, 0.3])
     mu_p = np.array([[3., -1.], [0., 1.], [-1., 1.], [-3,-3]])
     std_p = np.array([ 
@@ -125,9 +148,11 @@ def main():
 		[[1., 0.], [0., 1.]],
 		[[0.2, 0.],[0., 0.2]]  
 		])
-    
+    '''    
+
     # Data from actual dist
-    X_true = gen_from_proposal(mu_l, std_l, alpha_l, N)
+    #X_true = gen_from_proposal(mu_l, std_l, alpha_l, N)
+
     # initial data
     X = gen_from_proposal(mu_p, std_p, alpha_p, N)
 

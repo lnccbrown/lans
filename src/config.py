@@ -27,10 +27,9 @@ class Config(object):
 
         # Data configuration
         self.results_dir = '/media/data_cifs/lakshmi/projectABC/results/'
-	self.model_suffix = 'full_cov' if self.full_cov_matrix else 'isotropic'
         self.model_output = os.path.join(self.base_dir,
 					'models',
-					self.model_name+'_'+self.model_suffix)
+					self.model_name)
 	
 	self.data_prop = {'train':0.9, 'val':0.05, 'test':0.05}
 

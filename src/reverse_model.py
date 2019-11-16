@@ -215,7 +215,7 @@ def train_reverse_model(config):
 					target_data_dims=config.param_dims,
 					target_label_dims=config.output_hist_dims)
     with tf.device('/gpu:0'):
-        with tf.variable_scope("model") as scope:
+        with tf.variable_scope("reversemodel") as scope:
             print ("creating the model")
             model = cnn_reverse_model()
             model.build(train_data, config.output_hist_dims[1:], config.param_dims[1:], train_mode=True, full_cov=config.full_cov_matrix)
