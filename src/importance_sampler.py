@@ -9,6 +9,12 @@ import config
 import tensorflow as tf
 
 class ImportanceSampler:
+    def __getitem__(self, item):
+	return getattr(self, item)
+
+    def __contains__(self, item):
+	return hasattr(self, item)
+
     """
     We need to initialize two models here:
     Model1: dataset -> params (this will give us an initial proposal)
@@ -64,12 +70,32 @@ class ImportanceSampler:
 							'rev_'+self.cfg.model_name+'_'+self.cfg.model_suffix))
 	self.saver1.restore(self.inv_sess, ckpts)
 
+    def initializeMoG(self, mu_initial, std_initial, n_components=3, mu_perturbation=(-2., 2.), spread=10.):
+        
+	n_dims = mu_initial.shape[0]
+	# set the inital component weights
+	alpha_p = np.random.randint(low=1, high=n_components-1, size=n_components).astype(np.float32)
+	alpha_p[0] = n_components
+	alpha_p = alpha_p / alpha_p.sum()
 
-    def __getitem__(self, item):
-	return getattr(self, item)
+	# initialize the mu and sigma
+	mu_p = np.zeros((n_components, n_dims))
+	std_p = np.zeros((n_components, n_dims, n_dims))
 
-    def __contains__(self, item):
-	return hasattr(self, item)
+	# set the first component right on the point estimate
+	mu_p[0] = mu_initial
+	std_p[0] = np.diag(std_initial)
+
+	# initialize the other components by perturbing them a little bit around the point estimate
+	for c in range(1, n_components):
+            mu_p[c] = mu_p[0] + np.random.uniform(low=mu_perturbation[0], high=mu_perturbation[1], size=n_dims)*std_initial
+            std_p[c] = spread * std_p[0]
+        
+	# set the members
+        self.n_components = n_components
+	self.alpha_p = alpha_p
+	self.mu_p = mu_p
+	self.std_p = std_p
 
     def klDivergence(self, x, y, eps1=1e-7, eps2=1e-30):
 	return np.sum(x * np.log(eps2 + x/(y+eps1)))
@@ -133,44 +159,25 @@ def main():
 
     # load in the configurations
     cfg = config.Config()
+
     # initialize the importance sampler
     i_sampler = ImportanceSampler(cfg, max_iters=100, tol=1e-7, nsamples=10000)
-
-    import ipdb; ipdb.set_trace()
 
     # get an initial point estimate
     mu_initial, std_initial = i_sampler.getPointEstimate(data)
     
-    #mu_i_p = np.array([0.6200607 , 0.62816125, 0.61618066, 0.6699214 ])
-    #std_i_p = np.array([3.1749813e-03, 8.3681422e-05, 1.1085849e-04, 4.5179298e-05])
-
     # Initializing the mixture
-    n_components = 3
-    alpha_p = np.array([0.5, 0.25, 0.25])
-    
-    '''
-    mu_p = np.zeros((3, 4))
-    mu_p[0] = mu_i_p
-    mu_p[1] = mu_i_p + np.random.uniform(low=-2., high=2., size=4)*std_i_p
-    mu_p[2] = mu_i_p + np.random.uniform(low=-2., high=2., size=4)*std_i_p
-    std_p = np.zeros((3,4,4))
-    std_p[0] = np.diag(std_i_p)
-    std_p[1] = 10.*np.diag(std_i_p)
-    std_p[2] = 10.*np.diag(std_i_p)
-    '''
+    i_sampler.initializeMoG(mu_initial, std_initial, n_components=3, mu_perturbation=(-2., 2.), spread=10.)
 
-    # Data from actual dist
-    #X_true = gen_from_proposal(mu_l, std_l, alpha_l, N)
-
-    n_components = alpha_p.shape[0]
-    norm_perplexity = 0
-    cur_iter = 0
+    # convergence metric
+    norm_perplexity, cur_iter = 0., 0.
 
     while (cur_iter < max_iters):
 	print(alpha_p)
 
 	# sample parameters from the proposal distribution
 	X = i_sampler.generateFromProposal(mu_p, std_p, alpha_p, N)
+
 	# evaluate the likelihood of observering these parameters
 	target = i_sampler.getLikelihoodFromProposals(X, data)
 	import ipdb; ipdb.set_trace()	
