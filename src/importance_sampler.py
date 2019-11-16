@@ -1,7 +1,7 @@
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
-import tqdm, pickle, os
+import tqdm, pickle, os, time
 from mpl_toolkits.mplot3d import Axes3D
 from reverse_model import cnn_reverse_model
 from train_detector import cnn_model_struct
@@ -101,7 +101,7 @@ class ImportanceSampler:
 	return np.sum(x * np.log(eps2 + x/(y+eps1)))
 
     def likelihood(self, x, y, eps=1e-7):
-	return np.sum(-np.log(x+eps)*y)
+	return np.sum(-np.log(x+eps)*y, axis=1)
 
     '''
     feed forward through the inverse model to get a point estimate of the parameters that could've generated a given dataset
@@ -115,12 +115,8 @@ class ImportanceSampler:
     def getLikelihoodFromProposals(self, params, target):
 
 	params = np.expand_dims(np.expand_dims(params,-1),1)
-	import time;
-	t = time.time()
 	pred_data = self.forward_sess.run(self.forward_model.output, feed_dict={self.forward_input:params})
-	print (time.time() - t)
-	import ipdb; ipdb.set_trace()
-	return self.likelihood(pred_hist, self.target)
+	return self.likelihood(pred_data, target.reshape((-1,)))
 
     '''
     def eval_likelihood(x, mu_l, std_l, alpha_l):
@@ -130,22 +126,26 @@ class ImportanceSampler:
         for a in range(n_components):
             target += alpha_l[a] * stats.multivariate_normal.pdf(x, mean=mu_l[a], cov=std_l[a])
         return target
+    '''
 
-    def eval_proposal_by_component(x, mu_d, std_d):
+    def eval_proposal_by_component(self, x, mu_d, std_d):
         target = stats.multivariate_normal.pdf(x, mean=mu_d, cov=std_d)
         return target
-    '''
-    def generateFromProposal(self, mu_p, std_p, alpha_p, n):
-        component_indices = np.random.choice(alpha_p.shape[0], # number of components
-		                         p = alpha_p,          # component probabilities
-		     			 size = n,
-		     			 replace = True)
+    
+    def generateFromProposal(self):
+
+        component_indices = np.random.choice(
+					self.n_components, # number of components
+					p = self.alpha_p ,          # component probabilities
+					size = self.N ,
+					replace = True ) 
         _, unique_counts = np.unique(component_indices, return_counts=True)
+
         samples = np.array([])
-        for c in range(alpha_p.shape[0]):
+        for c in range(self.n_components):
             if c >= unique_counts.shape[0]:
 	        continue
- 	    cur_samps = np.random.multivariate_normal(size = unique_counts[c], mean = mu_p[c], cov = std_p[c])
+ 	    cur_samps = np.random.multivariate_normal(size = unique_counts[c], mean = self.mu_p[c], cov = self.std_p[c])
 	    if c == 0:
 	        samples = cur_samps
 	    else:
@@ -172,27 +172,30 @@ def main():
     # convergence metric
     norm_perplexity, cur_iter = 0., 0.
 
-    while (cur_iter < max_iters):
-	print(alpha_p)
+    while (cur_iter < i_sampler.max_iters):
+	print(i_sampler.alpha_p)
 
 	# sample parameters from the proposal distribution
-	X = i_sampler.generateFromProposal(mu_p, std_p, alpha_p, N)
+	X = i_sampler.generateFromProposal()
 
 	# evaluate the likelihood of observering these parameters
 	target = i_sampler.getLikelihoodFromProposals(X, data)
-	import ipdb; ipdb.set_trace()	
-	rho = np.zeros((n_components, N))
+	
+	rho = np.zeros((i_sampler.n_components, i_sampler.N))
+	import ipdb; ipdb.set_trace()
+
         # get rhos
-	for c in range(n_components):
-	    rho[c] = alpha_p[c] * eval_proposal_by_component(X, mu_p[c], std_p[c])
+	for c in range(i_sampler.n_components):
+	    rho[c] = i_sampler.alpha_p[c] * eval_proposal_by_component(X, mu_p[c], std_p[c]) # only issue
+
 	rho_sum = np.sum(rho, axis = 0)
 	rho = rho / rho_sum
 	w = np.exp(np.log(target) - np.log(rho_sum))
 	w = w / np.sum(w)
 
 	entropy = -1*np.sum(w * np.log(w))
-	norm_perplexity_cur = np.exp(entropy)/N
-	if (norm_perplexity - norm_perplexity_cur)**2 < tol:
+	norm_perplexity_cur = np.exp(entropy)/i_sampler.N
+	if (norm_perplexity - norm_perplexity_cur)**2 < i_sampler.tol:
 	    break
 	norm_perplexity = norm_perplexity_cur
 
