@@ -1,7 +1,7 @@
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
-import tqdm, pickle
+import tqdm, pickle, os
 from mpl_toolkits.mplot3d import Axes3D
 from reverse_model import cnn_reverse_model
 from train_detector import cnn_model_struct
@@ -14,25 +14,21 @@ class ImportanceSampler:
     Model1: dataset -> params (this will give us an initial proposal)
     Model2: params -> dataset (allows us to evaluate likelihood of subsequent IS iterations)
     """
-    def __init__(self, config):
+    def __init__(self, config, max_iters=100, tol=1e-7, nsamples=1e5):	
+
+	self.max_iters = max_iters
+	self.tol = tol
+	self.N = nsamples
+
 	self.cfg = config
 	self.target = []
 
-	# placeholder for inverse model
-	self.inv_model_inpdims = [1] + self.cfg.output_hist_dims[1:]
-	self.inv_input = tf.placeholder(tf.float32, self.inv_model_inpdims)
-	self.inv_initialized = False
-
 	# placeholder for forward model
-	self.forward_model_inpdims = [1] + self.cfg.param_dims[1:]
+	self.forward_model_inpdims = [10000] + self.cfg.param_dims[1:]
 	self.forward_input = tf.placeholder(tf.float32, self.forward_model_inpdims)
 	self.forward_initialized = False
-	with tf.device('/gpu:0'):
-	    with tf.variable_scope("reversemodel", reuse=tf.AUTO_REUSE) as scope:
-		# build the inverse model
-		self.inv_model = cnn_reverse_model()
-		self.inv_model.build(self.inv_input, self.cfg.output_hist_dims[1:], self.cfg.param_dims[1:], train_mode=False, verbose=False)
 
+	with tf.device('/gpu:0'):
 	    with tf.variable_scope("model", reuse=tf.AUTO_REUSE) as scope:
 		# build the forward model
 		self.forward_model = cnn_model_struct()
@@ -42,6 +38,32 @@ class ImportanceSampler:
 	    self.gpuconfig.gpu_options.allow_growth = True
 	    self.gpuconfig.allow_soft_placement = True
 	    self.saver = tf.train.Saver()
+	
+	self.forward_sess = tf.Session(config=self.gpuconfig)
+	ckpts = tf.train.latest_checkpoint(self.cfg.model_output)
+	self.saver.restore(self.forward_sess, ckpts)
+
+	# placeholder for inverse model
+	self.inv_model_inpdims = [1] + self.cfg.output_hist_dims[1:]
+	self.inv_input = tf.placeholder(tf.float32, self.inv_model_inpdims)
+	
+	with tf.device('/gpu:1'):
+	    with tf.variable_scope("reversemodel", reuse=tf.AUTO_REUSE) as scope:
+		# build the inverse model
+		self.inv_model = cnn_reverse_model()
+		self.inv_model.build(self.inv_input, self.cfg.output_hist_dims[1:], self.cfg.param_dims[1:], train_mode=False, verbose=False)
+
+	    self.gpuconfig1 = tf.ConfigProto()
+	    self.gpuconfig1.gpu_options.allow_growth = True
+	    self.gpuconfig1.allow_soft_placement = True
+	    self.saver1 = tf.train.Saver(var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='reversemodel'))
+
+	self.inv_sess = tf.Session(config=self.gpuconfig1)
+	ckpts = tf.train.latest_checkpoint(os.path.join(self.cfg.base_dir, 
+							'models',
+							'rev_'+self.cfg.model_name+'_'+self.cfg.model_suffix))
+	self.saver1.restore(self.inv_sess, ckpts)
+
 
     def __getitem__(self, item):
 	return getattr(self, item)
@@ -55,31 +77,24 @@ class ImportanceSampler:
     def likelihood(self, x, y, eps=1e-7):
 	return np.sum(-np.log(x+eps)*y)
 
-    def getInitialProposal(self, dataset):
-	if self.inv_initialized == False:
-	    self.inv_sess = tf.Session(config=self.gpuconfig)
-	    ckpts = tf.train.latest_checkpoint(os.path.join(self.cfg.base_dir, 
-							'models',
-							'rev_'+self.cfg.model_name+'_'+cfg.model_suffix))
-	    self.saver.restore(self.inv_sess, ckpts)
-	    self.inv_initializer = True
+    '''
+    feed forward through the inverse model to get a point estimate of the parameters that could've generated a given dataset
+    '''
+    def getPointEstimate(self, dataset):
 	params = self.inv_sess.run(self.inv_model.output, feed_dict={self.inv_input: dataset.reshape(self.inv_model_inpdims)})
 	nparams = np.prod(self.cfg.param_dims[1:])
-	
-	means = params[:nparams]
-	stds = params[nparams:]
+	means, stds = params[0][:nparams], params[0][nparams:]
 	return means, stds
 
-    def generateFromProposal(self, params):
-	if self.forward_initialized == False:
-	    self.forward_sess = tf.Session(config=self.gpuconfig)
-	    ckpts = tf.train.latest_checkpoint(self.cfg.model_output)
-	    self.saver.restore(self.forward_sess, ckpts)
-	    self.forward_initialized = True
+    def getLikelihoodFromProposals(self, params, target):
 
-	pred_data = self.sess.run(self.forward_model.output, feed_dict={self.forward_inp:params.reshape(self.forward_model_inpdims)})
-	#return self.likelihood(pred_hist, self.target)
-	return pred_data
+	params = np.expand_dims(np.expand_dims(params,-1),1)
+	import time;
+	t = time.time()
+	pred_data = self.forward_sess.run(self.forward_model.output, feed_dict={self.forward_input:params})
+	print (time.time() - t)
+	import ipdb; ipdb.set_trace()
+	return self.likelihood(pred_hist, self.target)
 
     '''
     def eval_likelihood(x, mu_l, std_l, alpha_l):
@@ -93,8 +108,8 @@ class ImportanceSampler:
     def eval_proposal_by_component(x, mu_d, std_d):
         target = stats.multivariate_normal.pdf(x, mean=mu_d, cov=std_d)
         return target
-
-    def gen_from_proposal(mu_p, std_p, alpha_p, n):
+    '''
+    def generateFromProposal(self, mu_p, std_p, alpha_p, n):
         component_indices = np.random.choice(alpha_p.shape[0], # number of components
 		                         p = alpha_p,          # component probabilities
 		     			 size = n,
@@ -110,7 +125,6 @@ class ImportanceSampler:
 	    else:
                 samples = np.concatenate([samples, cur_samps], axis=0)
         return samples
-    '''
 
 def main():
     # let's choose the dataset for which we'll try to get posteriors
@@ -120,41 +134,33 @@ def main():
     # load in the configurations
     cfg = config.Config()
     # initialize the importance sampler
-    i_sampler = ImportanceSampler(cfg)
-    os._exit(0)
-    max_iters = 100
-    tol = 1e-7
-    N = 100000
+    i_sampler = ImportanceSampler(cfg, max_iters=100, tol=1e-7, nsamples=10000)
 
-    '''
-    # this is what we want to achieve
-    alpha_l = np.array([0.5, 0.5])
-    mu_l = np.array([[1., 0.], [5., 0.], [-3., -3]])
-    std_l = np.array([
-		     [[.1, .0], [.0, .1]],
-		     [[.1, .0], [.0, .1]],
-                     [[.1, .0], [.0, .1]]
-		])
-    '''
+    import ipdb; ipdb.set_trace()
 
-    # get an initial proposal from our inverse model
-    mu_p, std_p = i_sampler.getInitialProposal()
+    # get an initial point estimate
+    mu_initial, std_initial = i_sampler.getPointEstimate(data)
+    
+    #mu_i_p = np.array([0.6200607 , 0.62816125, 0.61618066, 0.6699214 ])
+    #std_i_p = np.array([3.1749813e-03, 8.3681422e-05, 1.1085849e-04, 4.5179298e-05])
+
+    # Initializing the mixture
+    n_components = 3
+    alpha_p = np.array([0.5, 0.25, 0.25])
+    
     '''
-    alpha_p = np.array([0.3, 0.2, 0.2, 0.3])
-    mu_p = np.array([[3., -1.], [0., 1.], [-1., 1.], [-3,-3]])
-    std_p = np.array([ 
-		[[1., 0.5], [0.5, 1.]], 
-		[[3., 0.], [0., 3.]],
-		[[1., 0.], [0., 1.]],
-		[[0.2, 0.],[0., 0.2]]  
-		])
-    '''    
+    mu_p = np.zeros((3, 4))
+    mu_p[0] = mu_i_p
+    mu_p[1] = mu_i_p + np.random.uniform(low=-2., high=2., size=4)*std_i_p
+    mu_p[2] = mu_i_p + np.random.uniform(low=-2., high=2., size=4)*std_i_p
+    std_p = np.zeros((3,4,4))
+    std_p[0] = np.diag(std_i_p)
+    std_p[1] = 10.*np.diag(std_i_p)
+    std_p[2] = 10.*np.diag(std_i_p)
+    '''
 
     # Data from actual dist
     #X_true = gen_from_proposal(mu_l, std_l, alpha_l, N)
-
-    # initial data
-    X = gen_from_proposal(mu_p, std_p, alpha_p, N)
 
     n_components = alpha_p.shape[0]
     norm_perplexity = 0
@@ -162,9 +168,12 @@ def main():
 
     while (cur_iter < max_iters):
 	print(alpha_p)
-	X = gen_from_proposal(mu_p, std_p, alpha_p, N)
-	target = eval_likelihood(X, mu_l, std_l, alpha_l)
-	
+
+	# sample parameters from the proposal distribution
+	X = i_sampler.generateFromProposal(mu_p, std_p, alpha_p, N)
+	# evaluate the likelihood of observering these parameters
+	target = i_sampler.getLikelihoodFromProposals(X, data)
+	import ipdb; ipdb.set_trace()	
 	rho = np.zeros((n_components, N))
         # get rhos
 	for c in range(n_components):
@@ -193,6 +202,8 @@ def main():
 
 if __name__ == '__main__':
     X, w, X_true = main()
+
+    '''
     post_idx = np.random.choice(w.shape[0], p = w, replace = True, size = 100000)
     posterior_samples = X[post_idx, :]
 
@@ -204,4 +215,4 @@ if __name__ == '__main__':
     plt.hist(posterior_samples[:, 1], bins = 100, alpha = 0.2)
     plt.hist(X_true[:, 1], bins = 100, alpha = 0.2)
     plt.show()
-
+    '''

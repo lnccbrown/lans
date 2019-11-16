@@ -26,7 +26,6 @@ def main(train_mode=False,
     """
     cfg = config.Config()
     cfg.model_name = 'rev_' + cfg.model_name
-    cfg.model_suffix = 'full_cov' if cfg.full_cov_matrix else 'isotropic'
     cfg.model_output = os.path.join(cfg.base_dir, 'models', cfg.model_name+'_'+cfg.model_suffix) 
     if rev_train:
 	train_reverse_model(cfg)

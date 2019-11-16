@@ -24,6 +24,7 @@ class Config(object):
 	This only matters for the "reverse" model
 	"""
 	self.full_cov_matrix = False
+        self.model_suffix = 'full_cov' if self.full_cov_matrix else 'isotropic'
 
         # Data configuration
         self.results_dir = '/media/data_cifs/lakshmi/projectABC/results/'
