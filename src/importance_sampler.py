@@ -29,8 +29,10 @@ class ImportanceSampler:
 	self.cfg = config
 	self.target = []
 
+	self.inf_batch_size = 10000
+
 	# placeholder for forward model
-	self.forward_model_inpdims = [10000] + self.cfg.param_dims[1:]
+	self.forward_model_inpdims = [self.inf_batch_size] + self.cfg.param_dims[1:]
 	self.forward_input = tf.placeholder(tf.float32, self.forward_model_inpdims)
 	self.forward_initialized = False
 
@@ -107,16 +109,22 @@ class ImportanceSampler:
     feed forward through the inverse model to get a point estimate of the parameters that could've generated a given dataset
     '''
     def getPointEstimate(self, dataset):
+	#ndatapoints = dataset.shape[0]
 	params = self.inv_sess.run(self.inv_model.output, feed_dict={self.inv_input: dataset.reshape(self.inv_model_inpdims)})
 	nparams = np.prod(self.cfg.param_dims[1:])
+	#means, stds = params[:ndatapoints+1][:nparams], params[:ndatapoints+1][nparams:]
 	means, stds = params[0][:nparams], params[0][nparams:]
 	return means, stds
 
     def getLikelihoodFromProposals(self, params, target):
-
-	params = np.expand_dims(np.expand_dims(params,-1),1)
-	pred_data = self.forward_sess.run(self.forward_model.output, feed_dict={self.forward_input:params})
-	return self.likelihood(pred_data, target.reshape((-1,)))
+	nbatches = params.shape[0] / self.inf_batch_size
+	L = []
+	for batch in range(nbatches):
+	    params_cur = np.expand_dims(np.expand_dims(params[batch*self.inf_batch_size : (batch+1)*self.inf_batch_size, :],-1),1)
+	    pred_data = self.forward_sess.run(self.forward_model.output, feed_dict={self.forward_input:params_cur})
+	    likelihoods = self.likelihood(pred_data, target.reshape((-1,)))
+	    L.extend(likelihoods)
+	return np.array(L)
 
     '''
     def eval_likelihood(x, mu_l, std_l, alpha_l):
@@ -128,9 +136,8 @@ class ImportanceSampler:
         return target
     '''
 
-    def eval_proposal_by_component(self, x, mu_d, std_d):
-        target = stats.multivariate_normal.pdf(x, mean=mu_d, cov=std_d)
-        return target
+    def evalProposalByComponent(self, x, component):
+        return stats.multivariate_normal.pdf(x, mean=self.mu_p[component], cov=self.std_p[component])
     
     def generateFromProposal(self):
 
@@ -154,18 +161,19 @@ class ImportanceSampler:
 
 def main():
     # let's choose the dataset for which we'll try to get posteriors
-    my_data = pickle.load(open('../data/ddm/parameter_recovery/ddm_param_recovery_data_n_3000.pickle', 'rb'))
+    #my_data = pickle.load(open('../data/ddm/parameter_recovery/ddm_param_recovery_data_n_3000.pickle', 'rb'))
+    my_data = pickle.load(open('../data/ddm/ddm_ndt_base_simulations_10.pickle', 'rb'))
     data, params = my_data[0][0], my_data[1][0]
 
     # load in the configurations
     cfg = config.Config()
 
     # initialize the importance sampler
-    i_sampler = ImportanceSampler(cfg, max_iters=100, tol=1e-7, nsamples=10000)
+    i_sampler = ImportanceSampler(cfg, max_iters=100, tol=1e-7, nsamples=100000)
 
     # get an initial point estimate
     mu_initial, std_initial = i_sampler.getPointEstimate(data)
-    
+ 
     # Initializing the mixture
     i_sampler.initializeMoG(mu_initial, std_initial, n_components=3, mu_perturbation=(-2., 2.), spread=10.)
 
@@ -173,20 +181,18 @@ def main():
     norm_perplexity, cur_iter = 0., 0.
 
     while (cur_iter < i_sampler.max_iters):
-	print(i_sampler.alpha_p)
+	#print(i_sampler.alpha_p)
 
 	# sample parameters from the proposal distribution
 	X = i_sampler.generateFromProposal()
-
 	# evaluate the likelihood of observering these parameters
 	target = i_sampler.getLikelihoodFromProposals(X, data)
 	
 	rho = np.zeros((i_sampler.n_components, i_sampler.N))
-	import ipdb; ipdb.set_trace()
 
-        # get rhos
+        # rho: mixture posterior probabilities
 	for c in range(i_sampler.n_components):
-	    rho[c] = i_sampler.alpha_p[c] * eval_proposal_by_component(X, mu_p[c], std_p[c]) # only issue
+	    rho[c] = i_sampler.alpha_p[c] * i_sampler.evalProposalByComponent(X, c)
 
 	rho_sum = np.sum(rho, axis = 0)
 	rho = rho / rho_sum
@@ -198,20 +204,24 @@ def main():
 	if (norm_perplexity - norm_perplexity_cur)**2 < i_sampler.tol:
 	    break
 	norm_perplexity = norm_perplexity_cur
+	print('Step: {}, Perplexity: {}'.format(cur_iter,norm_perplexity))
+	#print(np.sum(w > 1e-15))
 
         # update proposal model parameters; in our case it is the alpha (s), mu (s) and std (s)
-	for c in range(n_components):
+	for c in range(i_sampler.n_components):
 	    tmp = w * rho[c]
-	    alpha_p[c] = np.sum(tmp)
-	    mu_p[c] = np.sum(X.transpose() * tmp, axis = 1) / alpha_p[c]
-	    cov_mats = np.array([np.outer(x,x) for x in (X - mu_p[c])])
-	    std_p[c] =  np.sum(cov_mats * tmp[:,np.newaxis, np.newaxis], axis = 0) / alpha_p[c]
+	    i_sampler.alpha_p[c] = np.sum(tmp)
+	    i_sampler.mu_p[c] = np.sum(X.transpose() * tmp, axis = 1) / i_sampler.alpha_p[c]
+	    cov_mats = np.array([np.outer(x,x) for x in (X - i_sampler.mu_p[c])])
+	    i_sampler.std_p[c] =  np.sum(cov_mats * tmp[:,np.newaxis, np.newaxis], axis = 0) / i_sampler.alpha_p[c]
 
 	cur_iter += 1
-    return X, w, X_true
+
+    import ipdb; ipdb.set_trace()
 
 if __name__ == '__main__':
-    X, w, X_true = main()
+    #X, w, X_true = main()
+    main()
 
     '''
     post_idx = np.random.choice(w.shape[0], p = w, replace = True, size = 100000)
