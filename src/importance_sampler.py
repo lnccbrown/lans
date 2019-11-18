@@ -103,7 +103,8 @@ class ImportanceSampler:
 	return np.sum(x * np.log(eps2 + x/(y+eps1)))
 
     def likelihood(self, x, y, eps=1e-7):
-	return np.sum(-np.log(x+eps)*y, axis=1)
+	#return np.sum(-np.log(x+eps)*y, axis=1)
+	return np.sum(np.log(x+eps)*y, axis=1)
 
     '''
     feed forward through the inverse model to get a point estimate of the parameters that could've generated a given dataset
@@ -159,26 +160,33 @@ class ImportanceSampler:
                 samples = np.concatenate([samples, cur_samps], axis=0)
         return samples
 
+    def countOOB(self, x):
+	v = np.zeros((x.shape[0],), dtype=bool)
+	for k in range(x.shape[1]):
+	    v = v | ((x[:,k] < self.cfg.bounds[k][0]) | (x[:,k] > self.cfg.bounds[k][1]))
+	return np.sum(v)
+
 def main():
     # let's choose the dataset for which we'll try to get posteriors
     #my_data = pickle.load(open('../data/ddm/parameter_recovery/ddm_param_recovery_data_n_3000.pickle', 'rb'))
     my_data = pickle.load(open('../data/ddm/ddm_ndt_base_simulations_10.pickle', 'rb'))
     data, params = my_data[0][0], my_data[1][0]
+    import ipdb; ipdb.set_trace()
 
     # load in the configurations
     cfg = config.Config()
 
     # initialize the importance sampler
-    i_sampler = ImportanceSampler(cfg, max_iters=100, tol=1e-7, nsamples=100000)
+    i_sampler = ImportanceSampler(cfg, max_iters=100, tol=1e-6, nsamples=100000)
 
     # get an initial point estimate
     mu_initial, std_initial = i_sampler.getPointEstimate(data)
  
     # Initializing the mixture
-    i_sampler.initializeMoG(mu_initial, std_initial, n_components=3, mu_perturbation=(-2., 2.), spread=10.)
+    i_sampler.initializeMoG(mu_initial, std_initial, n_components=3, mu_perturbation=(-1., 1.), spread=10.)
 
     # convergence metric
-    norm_perplexity, cur_iter = 0., 0.
+    norm_perplexity, cur_iter = -1.0, 0.
 
     while (cur_iter < i_sampler.max_iters):
 	#print(i_sampler.alpha_p)
@@ -186,7 +194,7 @@ def main():
 	# sample parameters from the proposal distribution
 	X = i_sampler.generateFromProposal()
 	# evaluate the likelihood of observering these parameters
-	target = i_sampler.getLikelihoodFromProposals(X, data)
+	log_target = i_sampler.getLikelihoodFromProposals(X, data)
 	
 	rho = np.zeros((i_sampler.n_components, i_sampler.N))
 
@@ -196,7 +204,7 @@ def main():
 
 	rho_sum = np.sum(rho, axis = 0)
 	rho = rho / rho_sum
-	w = np.exp(np.log(target) - np.log(rho_sum))
+	w = np.exp(log_target - np.log(rho_sum))
 	w = w / np.sum(w)
 
 	entropy = -1*np.sum(w * np.log(w))
@@ -204,7 +212,7 @@ def main():
 	if (norm_perplexity - norm_perplexity_cur)**2 < i_sampler.tol:
 	    break
 	norm_perplexity = norm_perplexity_cur
-	print('Step: {}, Perplexity: {}'.format(cur_iter,norm_perplexity))
+	print('Step: {}, Perplexity: {}, Num OOB: {}'.format(cur_iter, norm_perplexity, i_sampler.countOOB(X)))
 	#print(np.sum(w > 1e-15))
 
         # update proposal model parameters; in our case it is the alpha (s), mu (s) and std (s)
@@ -217,22 +225,11 @@ def main():
 
 	cur_iter += 1
 
-    import ipdb; ipdb.set_trace()
+    post_idx = np.random.choice(w.shape[0], p=w, replace=True, size = 100000)
+    posterior_samples = X[post_idx, :]
+    plt.figure()
+    plt.hist(posterior_samples[:,0], bins=100, alpha=0.2)
+    plt.show()
 
 if __name__ == '__main__':
-    #X, w, X_true = main()
     main()
-
-    '''
-    post_idx = np.random.choice(w.shape[0], p = w, replace = True, size = 100000)
-    posterior_samples = X[post_idx, :]
-
-    fig = plt.figure()
-    #plt.hist2d(X_true[:,0], X_true[:,1], bins = 100, alpha = 0.2)
-    plt.hist(posterior_samples[:, 0], bins = 100, alpha = 0.2)
-    plt.hist(X_true[:, 0], bins = 100, alpha = 0.2)
-    plt.figure()
-    plt.hist(posterior_samples[:, 1], bins = 100, alpha = 0.2)
-    plt.hist(X_true[:, 1], bins = 100, alpha = 0.2)
-    plt.show()
-    '''
