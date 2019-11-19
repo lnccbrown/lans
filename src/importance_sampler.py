@@ -7,6 +7,7 @@ from reverse_model import cnn_reverse_model
 from train_detector import cnn_model_struct
 import config
 import tensorflow as tf
+import pandas as pd
 
 class ImportanceSampler:
     def __getitem__(self, item):
@@ -103,7 +104,7 @@ class ImportanceSampler:
 	return np.sum(x * np.log(eps2 + x/(y+eps1)))
 
     def likelihood(self, x, y, eps=1e-7):
-	return np.sum(np.log(x+eps)*y*100., axis=1)
+	return np.sum(np.log(x+eps)*y*3000., axis=1)
 
     '''
     feed forward through the inverse model to get a point estimate of the parameters that could've generated a given dataset
@@ -182,11 +183,20 @@ class ImportanceSampler:
 	    v = v | ((x[:,k] < self.cfg.bounds[k][0]) | (x[:,k] > self.cfg.bounds[k][1]))
 	return np.sum(v)
 
+def plotMarginals(posterior_samples, params):
+    plt.figure()
+    for k in range(params.shape[0]):
+        plt.hist(posterior_samples[:,k], bins=100, alpha=0.2)
+	#plt.scatter(params[k],0,s=10)
+    plt.show()    
+
 def main():
     # let's choose the dataset for which we'll try to get posteriors
-    #my_data = pickle.load(open('../data/ddm/parameter_recovery/ddm_param_recovery_data_n_3000.pickle', 'rb'))
-    my_data = pickle.load(open('../data/ddm/ddm_ndt_base_simulations_10.pickle', 'rb'))
-    data, params = my_data[0][0], my_data[1][0]
+    my_data = pickle.load(open('../data/ddm/parameter_recovery/ddm_param_recovery_data_n_3000.pickle', 'rb'))
+    #my_data = pickle.load(open('../data/ddm/ddm_ndt_base_simulations_10.pickle', 'rb'))
+    data, params = my_data[0][973], my_data[1][973]
+    print('Params: {}'.format(params))
+
     # load in the configurations
     cfg = config.Config()
 
@@ -203,12 +213,14 @@ def main():
     norm_perplexity, cur_iter = -1.0, 0.
 
     while (cur_iter < i_sampler.max_iters):
-	#print(i_sampler.alpha_p)
+	print(i_sampler.mu_p)
 
 	# sample parameters from the proposal distribution
 	X = i_sampler.generateFromProposal()
 	# evaluate the likelihood of observering these parameters
 	log_target = i_sampler.getLikelihoodFromProposals(X, data)
+	# numerical stability
+	log_target = log_target - log_target.max()
 	
 	rho = np.zeros((i_sampler.n_components, i_sampler.N))
 
@@ -239,14 +251,17 @@ def main():
 
 	cur_iter += 1
 
-    post_idx = np.random.choice(w.shape[0], p=w, replace=True, size = 100000)
-    posterior_samples = X[post_idx, :]
-    plt.figure()
-    plt.hist(posterior_samples[:,0], bins=100, alpha=0.2)
-    plt.hist(posterior_samples[:,1], bins=100, alpha=0.2)
-    plt.hist(posterior_samples[:,2], bins=100, alpha=0.2)
-    plt.hist(posterior_samples[:,3], bins=100, alpha=0.2)
+        print('Predicted variances from the reverse model: {}'.format(std_initial))
+        post_idx = np.random.choice(w.shape[0], p=w, replace=True, size = 100000)
+        posterior_samples = X[post_idx, :]
+        print ('Covariance matrix: {}'.format(np.around(np.cov(posterior_samples.transpose()),decimals=6)))
+        print ('Correlation matrix: {}'.format(np.around(np.corrcoef(posterior_samples.transpose()),decimals=6)))
+
+    df = pd.DataFrame(posterior_samples)
+    pd.scatter_matrix(df, figsize=(6,6), alpha=0.01)
     plt.show()
+
+    plotMarginals(posterior_samples, params)    
 
 if __name__ == '__main__':
     main()

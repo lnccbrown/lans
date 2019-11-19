@@ -12,8 +12,8 @@ class Config(object):
 	self.summary_dir = 'summaries'
 
 	# select dataset
-	self.ddm_initialize()
-	self.inference_dataset = glob.glob('../data/ddm/parameter_recovery/*')
+	self.ornstein_initialize()
+	self.inference_dataset = glob.glob('../data/ornstein/parameter_recovery/*')
 
 	self.train_tfrecords = self.dataset_dir+'_train.tfrecords'
 	self.val_tfrecords = self.dataset_dir+'_val.tfrecords'

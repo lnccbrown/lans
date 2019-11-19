@@ -301,7 +301,7 @@ def train_reverse_model(config):
 		    print("\t val loss = {}, time_elapsed = {}s".format(v_loss, time.time() - val_forward_pass_time))
 		    
 		    nparams = np.prod(config.param_dims[1:])
-		    color_v = ['r', 'g', 'b', 'k']
+		    color_v = ['r', 'g', 'b', 'k', 'm', 'c', 'y']
 		    for k in range(nparams): 
 		        plt.scatter(norm_v_labels[:, k], v_res[:, k], c = color_v[k], alpha=0.5); 
 
