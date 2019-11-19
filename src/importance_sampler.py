@@ -103,8 +103,7 @@ class ImportanceSampler:
 	return np.sum(x * np.log(eps2 + x/(y+eps1)))
 
     def likelihood(self, x, y, eps=1e-7):
-	#return np.sum(-np.log(x+eps)*y, axis=1)
-	return np.sum(np.log(x+eps)*y, axis=1)
+	return np.sum(np.log(x+eps)*y*100., axis=1)
 
     '''
     feed forward through the inverse model to get a point estimate of the parameters that could've generated a given dataset
@@ -142,23 +141,40 @@ class ImportanceSampler:
     
     def generateFromProposal(self):
 
-        component_indices = np.random.choice(
+	samples = np.array([])
+	cur_iter = 0
+	while samples.shape[0] < self.N:
+            iter_samples = np.array([])
+            component_indices = np.random.choice(
 					self.n_components, # number of components
 					p = self.alpha_p ,          # component probabilities
 					size = self.N ,
 					replace = True ) 
-        _, unique_counts = np.unique(component_indices, return_counts=True)
+            _, unique_counts = np.unique(component_indices, return_counts=True)
 
-        samples = np.array([])
-        for c in range(self.n_components):
-            if c >= unique_counts.shape[0]:
-	        continue
- 	    cur_samps = np.random.multivariate_normal(size = unique_counts[c], mean = self.mu_p[c], cov = self.std_p[c])
-	    if c == 0:
-	        samples = cur_samps
+            for c in range(self.n_components):
+                if c >= unique_counts.shape[0]:
+	            continue
+ 	        cur_samps = np.random.multivariate_normal(size = unique_counts[c], mean = self.mu_p[c], cov = self.std_p[c])
+	        if c == 0:
+	            iter_samples = cur_samps
+	        else:
+                    iter_samples = np.concatenate([iter_samples, cur_samps], axis=0)
+	    idx = self.getOOBIndices(iter_samples)
+	    iter_samples = iter_samples[idx[0],:]
+	    if cur_iter == 0:
+	        samples = iter_samples
 	    else:
-                samples = np.concatenate([samples, cur_samps], axis=0)
-        return samples
+	        samples = np.concatenate([samples, iter_samples], axis = 0)
+	    cur_iter = cur_iter + 1
+
+        return samples[:self.N,:]
+
+    def getOOBIndices(self, x):
+	v = np.zeros((x.shape[0],), dtype=bool)
+	for k in range(x.shape[1]):
+	    v = v | ((x[:,k] < self.cfg.bounds[k][0]) | (x[:,k] > self.cfg.bounds[k][1]))
+	return np.where(v == 0)
 
     def countOOB(self, x):
 	v = np.zeros((x.shape[0],), dtype=bool)
@@ -171,8 +187,6 @@ def main():
     #my_data = pickle.load(open('../data/ddm/parameter_recovery/ddm_param_recovery_data_n_3000.pickle', 'rb'))
     my_data = pickle.load(open('../data/ddm/ddm_ndt_base_simulations_10.pickle', 'rb'))
     data, params = my_data[0][0], my_data[1][0]
-    import ipdb; ipdb.set_trace()
-
     # load in the configurations
     cfg = config.Config()
 
@@ -229,6 +243,9 @@ def main():
     posterior_samples = X[post_idx, :]
     plt.figure()
     plt.hist(posterior_samples[:,0], bins=100, alpha=0.2)
+    plt.hist(posterior_samples[:,1], bins=100, alpha=0.2)
+    plt.hist(posterior_samples[:,2], bins=100, alpha=0.2)
+    plt.hist(posterior_samples[:,3], bins=100, alpha=0.2)
     plt.show()
 
 if __name__ == '__main__':
