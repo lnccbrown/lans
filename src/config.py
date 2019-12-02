@@ -12,8 +12,8 @@ class Config(object):
 	self.summary_dir = 'summaries'
 
 	# select dataset
-	self.ornstein_initialize()
-	self.inference_dataset = glob.glob('../data/ornstein/parameter_recovery/*')
+	self.angle_initialize()
+	self.inference_dataset = glob.glob('../data/angle/parameter_recovery/*')
 
 	self.train_tfrecords = self.dataset_dir+'_train.tfrecords'
 	self.val_tfrecords = self.dataset_dir+'_val.tfrecords'
@@ -81,6 +81,7 @@ class Config(object):
 	self.param_dims = [None, 1, 7, 1]
 	self.test_param_dims = [1, 1, 7, 1]
 	self.output_hist_dims = [None, 1, 256, 2]
+	self.bounds = [(-2.0, 2.0), (0.6, 1.8), (0.3, 0.7), (0.25, 1.25), (0, 0.4), (0, 0.5), (0, 0.5)]
 
     def ornstein_initialize(self):
 	self.model_name = 'ornstein'

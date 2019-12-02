@@ -31,7 +31,7 @@ class ImportanceSampler:
 	self.cfg = config
 	self.target = []
 
-	self.inf_batch_size = 10000
+	self.inf_batch_size = 25000
 
 	# placeholder for forward model
 	self.forward_model_inpdims = [self.inf_batch_size] + self.cfg.param_dims[1:]
@@ -104,8 +104,8 @@ class ImportanceSampler:
     def klDivergence(self, x, y, eps1=1e-7, eps2=1e-30):
 	return np.sum(x * np.log(eps2 + x/(y+eps1)))
 
-    def likelihood(self, x, y, eps=1e-7):
-	return np.sum(np.log(x+eps)*y*10000., axis=1)
+    def likelihood(self, x, y, gamma, eps=1e-7):
+	return np.sum(np.log(x+eps)*y/gamma, axis=1)
 
     '''
     feed forward through the inverse model to get a point estimate of the parameters that could've generated a given dataset
@@ -118,13 +118,13 @@ class ImportanceSampler:
 	means, stds = params[0][:nparams], params[0][nparams:]
 	return means, stds
 
-    def getLikelihoodFromProposals(self, params, target):
+    def getLikelihoodFromProposals(self, params, target, gamma):
 	nbatches = params.shape[0] / self.inf_batch_size
 	L = []
 	for batch in range(nbatches):
 	    params_cur = np.expand_dims(np.expand_dims(params[batch*self.inf_batch_size : (batch+1)*self.inf_batch_size, :],-1),1)
 	    pred_data = self.forward_sess.run(self.forward_model.output, feed_dict={self.forward_input:params_cur})
-	    likelihoods = self.likelihood(pred_data, target.reshape((-1,)))
+	    likelihoods = self.likelihood(pred_data, target.reshape((-1,)), gamma)
 	    L.extend(likelihoods)
 	return np.array(L)
 
@@ -192,38 +192,37 @@ def plotMarginals(posterior_samples, params, filename):
     plt.savefig(filename)
     plt.show()    
 
-def main():
+def run(datafile='../data/bg_stn/bg_stn_binned.pickle', sample=0):
     # let's choose the dataset for which we'll try to get posteriors
-    #my_data = pickle.load(open('../data/ddm/parameter_recovery/ddm_param_recovery_data_n_3000.pickle', 'rb'))
-    my_data = pickle.load(open('../data/ornstein/ornstein_base_simulations_n_100000_20.pickle', 'rb'))
-    #my_data = pickle.load(open('../data/ddm/ddm_ndt_base_simulations_10.pickle', 'rb'))
-    data, params = my_data[0][100], my_data[1][100]
-
-    print('Params: {}'.format(params))
+    my_data = pickle.load(open(datafile ,'rb'))
+    data = my_data[0][sample]
+    data_norm = data / data.sum()
 
     # load in the configurations
     cfg = config.Config()
 
     # initialize the importance sampler
-    i_sampler = ImportanceSampler(cfg, max_iters=100, tol=1e-6, nsamples=100000)
+    i_sampler = ImportanceSampler(cfg, max_iters=100, tol=1e-5, nsamples=500000)
 
     # get an initial point estimate
-    mu_initial, std_initial = i_sampler.getPointEstimate(data)
+    mu_initial, std_initial = i_sampler.getPointEstimate(data_norm)
  
     # Initializing the mixture
-    i_sampler.initializeMoG(mu_initial, std_initial, n_components=3, mu_perturbation=(-1., 1.), spread=10.)
+    i_sampler.initializeMoG(mu_initial, std_initial, n_components=5, mu_perturbation=(-1., 1.), spread=10.)
 
     # convergence metric
     norm_perplexity, cur_iter = -1.0, 0.
 
+    # annealing factor
+    gamma = 64.
+
     start_time = time.time()
     while (cur_iter < i_sampler.max_iters):
-	#print(i_sampler.mu_p)
 
 	# sample parameters from the proposal distribution
 	X = i_sampler.generateFromProposal()
 	# evaluate the likelihood of observering these parameters
-	log_target = i_sampler.getLikelihoodFromProposals(X, data)
+	log_target = i_sampler.getLikelihoodFromProposals(X, data, gamma)
 	# numerical stability
 	log_target = log_target - log_target.max()
 	
@@ -242,9 +241,14 @@ def main():
 	norm_perplexity_cur = np.exp(entropy)/i_sampler.N
 	if (norm_perplexity - norm_perplexity_cur)**2 < i_sampler.tol:
 	    break
+
+        # update annealing term
+	diff = np.sign(norm_perplexity - norm_perplexity_cur)
+	if diff < 0:
+            gamma = np.maximum(gamma/2. , 1.)
+
 	norm_perplexity = norm_perplexity_cur
 	print('Step: {}, Perplexity: {}, Num OOB: {}'.format(cur_iter, norm_perplexity, i_sampler.countOOB(X)))
-	#print(np.sum(w > 1e-15))
 
         # update proposal model parameters; in our case it is the alpha (s), mu (s) and std (s)
 	for c in range(i_sampler.n_components):
@@ -265,12 +269,21 @@ def main():
     print ('Covariance matrix: {}'.format(np.around(np.cov(posterior_samples.transpose()),decimals=6)))
     print ('Correlation matrix: {}'.format(np.around(np.corrcoef(posterior_samples.transpose()),decimals=6)))
 
-    df = pd.DataFrame(posterior_samples)
-    pd.scatter_matrix(df, figsize=(6,6), alpha=0.01)
-    plt.savefig(os.path.join(cfg.results_dir, 'posteriors_{}_covariances.png'.format(cfg.model_name)))
-    plt.show()
+    #df = pd.DataFrame(posterior_samples)
+    #pd.scatter_matrix(df, figsize=(6,6), alpha=0.01)
+    #plt.savefig(os.path.join(cfg.results_dir, 'posteriors_{}_covariances.png'.format(cfg.model_name)))
+    #plt.show(block=False)
 
-    plotMarginals(posterior_samples, params, os.path.join(cfg.results_dir, 'posteriors_{}_marginals.png'.format(cfg.model_name)))    
+    #params = np.array([0., 0., 0., 0., 0.])
+    #plotMarginals(posterior_samples, params, os.path.join(cfg.results_dir, 'posteriors_{}_marginals.png'.format(cfg.model_name)))    
+
+    results = {'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p}
+    pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_bg_stn_sample_{}'.format(sample)),'wb'))
+
+def main():
+    nsamples = 6
+    for sample in range(nsamples):
+	run(sample=sample)
 
 if __name__ == '__main__':
     main()
