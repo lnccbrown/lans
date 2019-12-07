@@ -11,13 +11,18 @@ class Config(object):
 	self.tfrecord_dir = 'tfrecords'
 	self.summary_dir = 'summaries'
 
-	# select dataset
-	self.angle_initialize()
-	self.inference_dataset = glob.glob('../data/angle/parameter_recovery/*')
+	# training dataset features
+	self.isBinned = True
+	self.nBins = 512
+	self.nDatapoints = 100000
 
-	self.train_tfrecords = self.dataset_dir+'_train.tfrecords'
-	self.val_tfrecords = self.dataset_dir+'_val.tfrecords'
-	self.test_tfrecords = self.dataset_dir+'_test.tfrecords'
+	# select dataset
+	self.ddm_initialize(self.nBins)
+	self.inference_dataset = glob.glob('../data/ddm/parameter_recovery/*')
+
+	self.train_tfrecords = self.refname+'_train.tfrecords'
+	self.val_tfrecords = self.refname+'_val.tfrecords'
+	self.test_tfrecords = self.refname+'_test.tfrecords'
 
 	"""
 	Specify whether or not to treat gaussian errors as isotropic
@@ -56,13 +61,14 @@ class Config(object):
 	self.output_hist_dims = [None, 1, 256, 2]
 	self.bounds = [(-1.5, 1.5), (0.6, 1.5), (0.3, 0.7), (0.0, 1.0), (0, (np.pi / 2 - .2))]
 
-    def ddm_initialize(self):
-	self.dataset_dir = 'ddm_ndt'
-	self.dataset = 'ddm_ndt*'
+    def ddm_initialize(self, nbins):
+	self.dataset = 'ddm_nchoices*'
 	self.model_name = 'ddm'
+	self.dataset_dir = os.path.join(self.model_name, 'training_data_binned_{}_nbins_{}_n_{}'.format(int(self.isBinned),self.nBins,self.nDatapoints))
+	self.refname = self.dataset_dir.replace('/','_')
 	self.param_dims = [None, 1, 4, 1]
 	self.test_param_dims = [1, 1, 4, 1]
-	self.output_hist_dims = [None, 1, 256, 2]
+	self.output_hist_dims = [None, 1, nbins, 2]
 	self.bounds = [(-2.0, 2.0), (0.5, 1.5), (0.3, 0.7), (0.0, 1.0)]
 
     def weibull_initialize(self):

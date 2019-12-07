@@ -202,7 +202,7 @@ def run(datafile='../data/bg_stn/bg_stn_binned.pickle', sample=0):
     cfg = config.Config()
 
     # initialize the importance sampler
-    i_sampler = ImportanceSampler(cfg, max_iters=100, tol=1e-5, nsamples=500000)
+    i_sampler = ImportanceSampler(cfg, max_iters=100, tol=1e-6, nsamples=500000)
 
     # get an initial point estimate
     mu_initial, std_initial = i_sampler.getPointEstimate(data_norm)
@@ -282,8 +282,7 @@ def run(datafile='../data/bg_stn/bg_stn_binned.pickle', sample=0):
 
 def main():
     nsamples = 6
-    for sample in range(nsamples):
-	run(sample=sample)
+    run(sample=3)
 
 if __name__ == '__main__':
     main()
