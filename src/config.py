@@ -4,7 +4,7 @@ import glob
 
 class Config(object):
 
-    def __init__(self):
+    def __init__(self, model='ddm', bins=256, N=1024):
         # Directory setup
         self.base_dir = '/media/data_cifs/lakshmi/projectABC/'
         self.data_dir = 'data'
@@ -13,12 +13,26 @@ class Config(object):
 
 	# training dataset features
 	self.isBinned = True
-	self.nBins = 512
+	self.nBins = bins
 	self.nDatapoints = 100000
+	self.N = N
+
+
+	self.method_options = {'ddm': self.ddm_initialize, 'angle': self.angle_initialize, 'weibull': self.weibull_initialize, 'ornstein': self.ornstein_initialize,
+			'fullddm': self.full_ddm_initialize, 'race_model_3': self.race_model_3_initialize, 'race_model_4': self.race_model_4_initialize,
+			'lca_3': self.lca_3_initialize, 'lca_4': self.lca_4_initialize}
+
+	# select model
+	self.method_options[model](self.nBins)
 
 	# select dataset
-	self.ddm_initialize(self.nBins)
-	self.inference_dataset = glob.glob('../data/ddm/parameter_recovery/*')
+	param_recovery_folder = os.path.join('../data/{}'.format(self.model_name),
+					'parameter_recovery_data_binned_{}_nbins_{}_n_{}'.format(int(self.isBinned), self.nBins, self.N))
+
+	self.inference_dataset = glob.glob('{}/*'.format(param_recovery_folder))
+	
+	self.dataset_dir = os.path.join(self.model_name, 'training_data_binned_{}_nbins_{}_n_{}'.format(int(self.isBinned),self.nBins,self.nDatapoints))
+	self.refname = self.dataset_dir.replace('/','_')
 
 	self.train_tfrecords = self.refname+'_train.tfrecords'
 	self.val_tfrecords = self.refname+'_val.tfrecords'
@@ -35,7 +49,7 @@ class Config(object):
         self.results_dir = '/media/data_cifs/lakshmi/projectABC/results/'
         self.model_output = os.path.join(self.base_dir,
 					'models',
-					self.model_name)
+					self.refname)
 	
 	self.data_prop = {'train':0.9, 'val':0.05, 'test':0.05}
 
@@ -43,7 +57,7 @@ class Config(object):
 	self.param_range = np.array([x[1] - x[0] for x in self.bounds])
 
         # Model hyperparameters
-        self.epochs = 15
+        self.epochs = 50
         self.train_batch = 128
         self.val_batch = 64
         self.test_batch = 128
@@ -52,83 +66,84 @@ class Config(object):
 	# how often do you want to validate?
 	self.val_iters = 1000
 
-    def angle_initialize(self):
-	self.dataset_dir = 'angle_ndt'
-	self.dataset = 'angle_ndt*'
+    def angle_initialize(self, nbins):
+	self.dataset = 'angle_nchoices*'
 	self.model_name = 'angle'
 	self.param_dims = [None, 1, 5, 1]
 	self.test_param_dims = [1, 1, 5, 1]
-	self.output_hist_dims = [None, 1, 256, 2]
-	self.bounds = [(-1.5, 1.5), (0.6, 1.5), (0.3, 0.7), (0.0, 1.0), (0, (np.pi / 2 - .2))]
+	self.output_hist_dims = [None, 1, nbins, 2]
+	self.bounds = [(-2.5, 2.5), (0.2, 2.0), (0.1, 0.9), (0.0, 2.0), (0, (np.pi / 2 - .2))]
 
     def ddm_initialize(self, nbins):
 	self.dataset = 'ddm_nchoices*'
 	self.model_name = 'ddm'
-	self.dataset_dir = os.path.join(self.model_name, 'training_data_binned_{}_nbins_{}_n_{}'.format(int(self.isBinned),self.nBins,self.nDatapoints))
-	self.refname = self.dataset_dir.replace('/','_')
 	self.param_dims = [None, 1, 4, 1]
 	self.test_param_dims = [1, 1, 4, 1]
 	self.output_hist_dims = [None, 1, nbins, 2]
-	self.bounds = [(-2.0, 2.0), (0.5, 1.5), (0.3, 0.7), (0.0, 1.0)]
+	self.bounds = [(-2.5, 2.5), (0.2, 2), (0.1, 0.9), (0.0, 2.0)]
 
-    def weibull_initialize(self):
+    def weibull_initialize(self, nbins):
 	self.model_name = 'weibull'
-	self.dataset_dir = 'weibull_cdf_ndt'
-	self.dataset = 'weibull_cdf_ndt*'
+	self.dataset = 'weibull_cdf_nchoices*'
 	self.param_dims = [None, 1, 6, 1]
 	self.test_param_dims = [1, 1, 6, 1]
-	self.output_hist_dims = [None, 1, 256, 2]
-	self.bounds = [(-1.5, 1.5), (0.6, 1.5), (0.3, 0.7), (0.0, 1.0), (0.5, 5.0), (0.5, 7.0)]
+	self.output_hist_dims = [None, 1, nbins, 2]
+	self.bounds = [(-2.5, 2.5), (0.2, 2.0), (0.1, 0.9), (0.0, 2.0), (0.5, 5.0), (0.5, 7.0)]
 
-    def full_ddm_initialize(self):
-	self.dataset_dir = 'full_ddm'
-        self.dataset = 'full_ddm*'
-	self.model_name = 'fullddm'
+    def full_ddm_initialize(self, nbins):
+        self.dataset = 'full_ddm_nchoices*'
+	self.model_name = 'full_ddm'
 	self.param_dims = [None, 1, 7, 1]
 	self.test_param_dims = [1, 1, 7, 1]
-	self.output_hist_dims = [None, 1, 256, 2]
-	self.bounds = [(-2.0, 2.0), (0.6, 1.8), (0.3, 0.7), (0.25, 1.25), (0, 0.4), (0, 0.5), (0, 0.5)]
+	self.output_hist_dims = [None, 1, nbins, 2]
+	self.bounds = [(-2.5, 2.5), (0.2, 2.0), (0.1, 0.9), (0.25, 2.5), (0, 0.4), (0, 1), (0.0, 0.5)]
 
-    def ornstein_initialize(self):
+    def ornstein_initialize(self, nbins):
 	self.model_name = 'ornstein'
-	self.dataset_dir = 'ornstein'
-	self.dataset = 'ornstein_base*'
+	self.dataset = 'ornstein_nchoices*'
 	self.param_dims = [None, 1, 5, 1]
 	self.test_param_dims = [1, 1, 5, 1]
-	self.output_hist_dims = [None, 1, 256, 2]
-	self.bounds = [(-1.5, 1.5), (0.5, 1.5), (0.3, 0.7), (-1.0, 1.0), (0.0, 1.0)]
+	self.output_hist_dims = [None, 1, nbins, 2]
+	self.bounds = [(-2.5, 2.5), (0.2, 2.0), (0.1, 0.9), (-1.0, 1.0), (0.0, 2.0)]
 
-    def race_model_3_initialize(self):
+    def race_model_3_initialize(self, nbins):
 	self.model_name = 'race_model_3'
-	self.dataset_dir = 'race_model_3'
-	self.dataset = 'race_model_base*'
+	#self.dataset_dir = 'race_model_3'
+	self.dataset = 'race_model_nchoices*'
 	self.param_dims = [None, 1, 8, 1]
 	self.test_param_dims = [1, 1, 8, 1]
-	self.output_hist_dims = [None, 1, 256, 3]
+	self.output_hist_dims = [None, 1, nbins, 3]
+	self.bounds = [(0, 2.0), (1, 3), (0.2, 0.8), (0.0, 1.0), (0, 2.0), (0.2,0.8), (0,2.0), (0.2,0.8), (0, 2.),(0.2, 0.8)]
 
-    def lca_3_initialize(self):
+    def lca_3_initialize(self, nbins):
 	self.model_name = 'lca_3'
-	self.dataset_dir = 'lca_3'
-	self.dataset = 'lca_base*'
+	#self.dataset_dir = 'lca_3'
+	self.dataset = 'lca_nchoices*'
 	self.param_dims = [None, 1, 10, 1]
 	self.test_param_dims = [1, 1, 10, 1]
-	self.output_hist_dims = [None, 1, 256, 3]
+	self.output_hist_dims = [None, 1, nbins, 3]
+	self.bounds = [(0, 2.0), (1, 3), (0.2, 0.8), (0.0, 1.0), (0, 2.0), (0.2,0.8), (0,2.0), (0.2,0.8), (0, 2.),(0.2, 0.8)]
 
-    def race_model_4_initialize(self):
+
+    def race_model_4_initialize(self, nbins):
 	self.model_name = 'race_model_4'
-	self.dataset_dir = 'race_model_4'
-	self.dataset = 'race_model_base*'
+	#self.dataset_dir = 'race_model_4'
+	self.dataset = 'race_model_nchoices*'
 	self.param_dims = [None, 1, 10, 1]
 	self.test_param_dims = [1, 1, 10, 1]
-	self.output_hist_dims = [None, 1, 256, 4]
+	self.output_hist_dims = [None, 1, nbins, 4]
+	self.bounds = [(0, 2.0), (1, 3), (0.2, 0.8), (0.0, 1.0), (0, 2.0), (0.2,0.8), (0,2.0), (0.2,0.8), (0, 2.),(0.2, 0.8), (0,2.), (0.2, 0.8)]
 
-    def lca_4_initialize(self):
+
+    def lca_4_initialize(self, nbins):
 	self.model_name = 'lca_4'
-	self.dataset_dir = 'lca_4'
-	self.dataset = 'lca_base*'
+	#self.dataset_dir = 'lca_4'
+	self.dataset = 'lca_nchoices*'
 	self.param_dims = [None, 1, 12, 1]
 	self.test_param_dims = [1, 1, 12, 1]
-	self.output_hist_dims = [None, 1, 256, 4]
+	self.output_hist_dims = [None, 1, nbins, 4]
+	self.bounds = [(0, 2.0), (1, 3), (0.2, 0.8), (0.0, 1.0), (0, 2.0), (0.2,0.8), (0,2.0), (0.2,0.8), (0, 2.),(0.2, 0.8), (0,2.), (0.2, 0.8)]
+
 
     def race_model_5_initialize(self):
 	self.model_name = 'race_model_5'

@@ -299,7 +299,7 @@ def train_reverse_model(config):
 		    summary_str = sess.run(summary_op)
 		    train_writer.add_summary(summary_str, step)
 		    print("\t val loss = {}, time_elapsed = {}s".format(v_loss, time.time() - val_forward_pass_time))
-		    
+		    '''
 		    nparams = np.prod(config.param_dims[1:])
 		    color_v = ['r', 'g', 'b', 'k', 'm', 'c', 'y']
 		    for k in range(nparams): 
@@ -307,7 +307,7 @@ def train_reverse_model(config):
 
 		    plt.pause(1);
 		    plt.clf()
-
+		    '''
 		    if config.full_cov_matrix:
 		        data_dump = {'predictions': outputs, 'labels': norm_tr_labels, 'cov':cov_mat}
 		        pickle.dump(data_dump, open( os.path.join(config.base_dir,config.summary_dir,config.model_name,'step%d.pickle'%step), 'wb'))

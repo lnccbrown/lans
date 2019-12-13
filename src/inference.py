@@ -77,9 +77,10 @@ if __name__ == '__main__':
     n_workers = 20
     workers = Pool(n_workers)
     for infdata in cfg.inference_dataset:
+	#import ipdb; ipdb.set_trace()
         #workers = Pool(n_workers)
         simulated_data = pickle.load(open(infdata,'rb'))
-        simulated_data = simulated_data[0]
+        simulated_data = simulated_data[1].reshape((-1,simulated_data[1].shape[2],simulated_data[1].shape[3]))
         nsamples = simulated_data.shape[0]    
         rec_params = []
         for _ in tqdm.tqdm(workers.imap(model_inference, simulated_data), total=nsamples):
@@ -87,10 +88,10 @@ if __name__ == '__main__':
             pass
         # plot the results
         rec_params = np.array(rec_params)
-        GT = pickle.load(open(infdata,'rb'))[1][:nsamples]
+        GT = np.tile(pickle.load(open(infdata,'rb'))[0][:nsamples],(10,1))
 	result = {'pred':rec_params, 'gt':GT}
 	pickle.dump(result,open(os.path.join(cfg.results_dir,infdata.split('/')[-1].split('.')[0]+'_recovery.p'),'wb'))
-	'''
+	
         cmap = mpl.cm.get_cmap('Paired')
         nplots = GT.shape[1]
         fig, ax = plt.subplots(int(np.ceil(nplots/3.)), 3)
@@ -99,7 +100,7 @@ if __name__ == '__main__':
 	    ax[int(k/3),(k%3)].set_title('Parameter {}'.format(k+1),fontsize=6)
 	    ax[int(k/3),(k%3)].set_xlabel('true parameters')
 	    ax[int(k/3),(k%3)].set_ylabel('recovered parameters')
-        plt.savefig(os.path.join(cfg.results_dir,infdata.split('/')[-1].split('.')[0]+'_recovery.png'), dpi=300, bbox_inches='tight')
-        plt.close()
-        #plt.show()
-	'''
+        #plt.savefig(os.path.join(cfg.results_dir,infdata.split('/')[-1].split('.')[0]+'_recovery.png'), dpi=300, bbox_inches='tight')
+        #plt.close()
+        plt.show()
+	
