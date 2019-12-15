@@ -26,7 +26,9 @@ def main(train_mode=False,
     """
     cfg = config.Config()
     cfg.model_name = 'rev_' + cfg.model_name
-    cfg.model_output = os.path.join(cfg.base_dir, 'models', cfg.model_name+'_'+cfg.model_suffix) 
+    #cfg.model_output = os.path.join(cfg.base_dir, 'models', cfg.model_name+'_'+cfg.model_suffix) 
+    cfg.model_output = os.path.join(cfg.base_dir, 'models', cfg.model_name+'_training_data_binned_{}_nbins_{}_n_{}'.format(int(cfg.isBinned),cfg.nBins,cfg.nDatapoints))
+    
     if rev_train:
 	train_reverse_model(cfg)
 	os._exit(0)

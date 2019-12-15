@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from multiprocessing import Pool
 import pickle
+from functools import partial
 
 plt.rcParams['font.size']= 6
 # just to prevent tensorflow from printing logs
@@ -60,30 +61,25 @@ class Infer:
 	#return self.klDivergence(pred_hist, self.target)
 	return self.likelihood(pred_hist, self.target)
 
-def model_inference(simdata):
-    cfg = config.Config()
-    inference_class = Infer(config=cfg)
-    #bounds = []
-    #for k in range(np.prod(cfg.test_param_dims[-2:])):
-    #    bounds.append((-2,2))
-    bounds = cfg.bounds
+def model_inference(args):
+    simdata = args['data']
+    inf_cfg = config.Config(model=args['model'], bins=args['nbin'], N=args['N'])
+    inference_class = Infer(config=inf_cfg)
+    bounds = inf_cfg.bounds
     inference_class.target = simdata.reshape((-1,))
     output = differential_evolution(inference_class.objectivefn,bounds)
     inference_class.sess.close()
     return output.x
 
-if __name__ == '__main__':
-    cfg = config.Config()
-    n_workers = 20
-    workers = Pool(n_workers)
-    for infdata in cfg.inference_dataset:
-	#import ipdb; ipdb.set_trace()
-        #workers = Pool(n_workers)
+def run(workers, model, nbin, N):
+    my_config = config.Config(model=model, bins=nbin, N=N)
+    for infdata in my_config.inference_dataset:
         simulated_data = pickle.load(open(infdata,'rb'))
         simulated_data = simulated_data[1].reshape((-1,simulated_data[1].shape[2],simulated_data[1].shape[3]))
         nsamples = simulated_data.shape[0]    
         rec_params = []
-        for _ in tqdm.tqdm(workers.imap(model_inference, simulated_data), total=nsamples):
+	tuples = [{'data':x,'model':model, 'nbin':nbin, 'N':N} for x in simulated_data]
+        for _ in tqdm.tqdm(workers.imap(model_inference, tuples), total=nsamples):
     	    rec_params.append(_)
             pass
         # plot the results
@@ -100,7 +96,21 @@ if __name__ == '__main__':
 	    ax[int(k/3),(k%3)].set_title('Parameter {}'.format(k+1),fontsize=6)
 	    ax[int(k/3),(k%3)].set_xlabel('true parameters')
 	    ax[int(k/3),(k%3)].set_ylabel('recovered parameters')
-        #plt.savefig(os.path.join(cfg.results_dir,infdata.split('/')[-1].split('.')[0]+'_recovery.png'), dpi=300, bbox_inches='tight')
-        #plt.close()
-        plt.show()
+        plt.savefig(os.path.join(cfg.results_dir,infdata.split('/')[-1].split('.')[0]+'_recovery.png'), dpi=300, bbox_inches='tight')
+        plt.close()
 	
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', type=str)
+    parser.add_argument('--nbin', type=int)
+    parser.add_argument('--N', type=int)
+    args = parser.parse_args()
+
+    cfg = config.Config()
+    n_workers = 20
+    workers = Pool(n_workers)
+
+    run(workers, args.model, args.nbin, args.N)
+    #models = ['ddm', 'angle', 'weibull', 'ornstein', 'fullddm']
+    #nbins = [256, 512]
+    #Ns = [128, 1024, 8192]

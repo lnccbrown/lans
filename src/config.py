@@ -4,7 +4,7 @@ import glob
 
 class Config(object):
 
-    def __init__(self, model='ddm', bins=256, N=1024):
+    def __init__(self, model=None, bins=None, N=None):
         # Directory setup
         self.base_dir = '/media/data_cifs/lakshmi/projectABC/'
         self.data_dir = 'data'
@@ -13,10 +13,18 @@ class Config(object):
 
 	# training dataset features
 	self.isBinned = True
-	self.nBins = bins
+	if model is None:
+	    model = 'ornstein'
+	if bins != None:
+	    self.nBins = bins
+	else:
+	    self.nBins = 256
 	self.nDatapoints = 100000
-	self.N = N
 
+	if N != None:
+	    self.N = N
+	else:
+	    self.N = 1024
 
 	self.method_options = {'ddm': self.ddm_initialize, 'angle': self.angle_initialize, 'weibull': self.weibull_initialize, 'ornstein': self.ornstein_initialize,
 			'fullddm': self.full_ddm_initialize, 'race_model_3': self.race_model_3_initialize, 'race_model_4': self.race_model_4_initialize,
@@ -113,7 +121,7 @@ class Config(object):
 	self.param_dims = [None, 1, 8, 1]
 	self.test_param_dims = [1, 1, 8, 1]
 	self.output_hist_dims = [None, 1, nbins, 3]
-	self.bounds = [(0, 2.0), (1, 3), (0.2, 0.8), (0.0, 1.0), (0, 2.0), (0.2,0.8), (0,2.0), (0.2,0.8), (0, 2.),(0.2, 0.8)]
+	self.bounds = [(0.0, 2.5), (0.0, 2.5), (0.0, 2.5), (1.0, 3.0), (0.1, 0.9), (0.1, 0.9), (0.1, 0.9), (0.0, 2.0)]
 
     def lca_3_initialize(self, nbins):
 	self.model_name = 'lca_3'
@@ -122,8 +130,7 @@ class Config(object):
 	self.param_dims = [None, 1, 10, 1]
 	self.test_param_dims = [1, 1, 10, 1]
 	self.output_hist_dims = [None, 1, nbins, 3]
-	self.bounds = [(0, 2.0), (1, 3), (0.2, 0.8), (0.0, 1.0), (0, 2.0), (0.2,0.8), (0,2.0), (0.2,0.8), (0, 2.),(0.2, 0.8)]
-
+	self.bounds = [(0, 2.5), (0., 2.5), (0., 2.5), (1.0, 3.0), (0.1, 0.9), (0.1, 0.9), (0.1, 0.9), (-1.0, 1.0), (-1.0, 1.0), (0.0, 2.0)]
 
     def race_model_4_initialize(self, nbins):
 	self.model_name = 'race_model_4'
@@ -132,8 +139,7 @@ class Config(object):
 	self.param_dims = [None, 1, 10, 1]
 	self.test_param_dims = [1, 1, 10, 1]
 	self.output_hist_dims = [None, 1, nbins, 4]
-	self.bounds = [(0, 2.0), (1, 3), (0.2, 0.8), (0.0, 1.0), (0, 2.0), (0.2,0.8), (0,2.0), (0.2,0.8), (0, 2.),(0.2, 0.8), (0,2.), (0.2, 0.8)]
-
+	self.bounds = [(0.0, 2.5), (0.0, 2.5), (0.0, 2.5), (0.0, 2.5), (1.0, 3.0), (0.1, 0.9), (0.1, 0.9), (0.1, 0.9), (0.1, 0.9), (0.0, 2.0)]
 
     def lca_4_initialize(self, nbins):
 	self.model_name = 'lca_4'
@@ -142,8 +148,7 @@ class Config(object):
 	self.param_dims = [None, 1, 12, 1]
 	self.test_param_dims = [1, 1, 12, 1]
 	self.output_hist_dims = [None, 1, nbins, 4]
-	self.bounds = [(0, 2.0), (1, 3), (0.2, 0.8), (0.0, 1.0), (0, 2.0), (0.2,0.8), (0,2.0), (0.2,0.8), (0, 2.),(0.2, 0.8), (0,2.), (0.2, 0.8)]
-
+	self.bounds = [(0, 2.5), (0., 2.5), (0., 2.5), (0., 2.5), (1.0, 3.0), (0.1, 0.9), (0.1, 0.9), (0.1, 0.9), (0.1, 0.9), (-1.0, 1.0), (-1.0, 1.0), (0.0, 2.0)]
 
     def race_model_5_initialize(self):
 	self.model_name = 'race_model_5'

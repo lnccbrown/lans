@@ -69,9 +69,8 @@ class ImportanceSampler:
 	    self.saver1 = tf.train.Saver(var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='reversemodel'))
 
 	self.inv_sess = tf.Session(config=self.gpuconfig1)
-	ckpts = tf.train.latest_checkpoint(os.path.join(self.cfg.base_dir, 
-							'models',
-							'rev_'+self.cfg.model_name+'_'+self.cfg.model_suffix))
+	ckpts = tf.train.latest_checkpoint(os.path.join(self.cfg.base_dir, 'models', 'rev_'+self.cfg.model_name+'_training_data_binned_{}_nbins_{}_n_{}'.format(int(self.cfg.isBinned),self.cfg.nBins,self.cfg.nDatapoints))
+)
 	self.saver1.restore(self.inv_sess, ckpts)
 
     def initializeMoG(self, mu_initial, std_initial, n_components=3, mu_perturbation=(-2., 2.), spread=10.):
@@ -193,6 +192,7 @@ def plotMarginals(posterior_samples, params, filename):
     plt.show()    
 
 def run(datafile='../data/bg_stn/bg_stn_binned.pickle', sample=0):
+    #import ipdb; ipdb.set_trace()
     # let's choose the dataset for which we'll try to get posteriors
     my_data = pickle.load(open(datafile ,'rb'))
     data = my_data[0][sample]
@@ -277,12 +277,95 @@ def run(datafile='../data/bg_stn/bg_stn_binned.pickle', sample=0):
     #params = np.array([0., 0., 0., 0., 0.])
     #plotMarginals(posterior_samples, params, os.path.join(cfg.results_dir, 'posteriors_{}_marginals.png'.format(cfg.model_name)))    
 
-    results = {'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p}
-    pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_bg_stn_sample_{}'.format(sample)),'wb'))
+    results = {'mu_initial': mu_initial, 'std_initial':std_initial, 'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p}
+    pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_bg_stn_sample_{}_model_{}'.format(sample,cfg.refname)),'wb'))
+
+def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6):
+    
+    # load in the configurations
+    cfg = config.Config()
+
+    # initialize the importance sampler
+    i_sampler = ImportanceSampler(cfg, max_iters=75, tol=1e-6, nsamples=500000)
+    
+    for sample in range(nsample):
+        # let's choose the dataset for which we'll try to get posteriors
+        my_data = pickle.load(open(datafile ,'rb'))
+        data = my_data[0][sample]
+        data_norm = data / data.sum()
+    
+        # get an initial point estimate
+        mu_initial, std_initial = i_sampler.getPointEstimate(data_norm)
+ 
+        # Initializing the mixture
+        i_sampler.initializeMoG(mu_initial, std_initial, n_components=5, mu_perturbation=(-1., 1.), spread=10.)
+
+        # convergence metric
+        norm_perplexity, cur_iter = -1.0, 0.
+
+        # annealing factor
+        gamma = 64.
+
+        start_time = time.time()
+        while (cur_iter < i_sampler.max_iters):
+
+	    # sample parameters from the proposal distribution
+	    X = i_sampler.generateFromProposal()
+	    # evaluate the likelihood of observering these parameters
+	    log_target = i_sampler.getLikelihoodFromProposals(X, data, gamma)
+	    # numerical stability
+	    log_target = log_target - log_target.max()
+	
+	    rho = np.zeros((i_sampler.n_components, i_sampler.N))
+
+            # rho: mixture posterior probabilities
+	    for c in range(i_sampler.n_components):
+	        rho[c] = i_sampler.alpha_p[c] * i_sampler.evalProposalByComponent(X, c)
+
+	    rho_sum = np.sum(rho, axis = 0)
+	    rho = rho / rho_sum
+	    w = np.exp(log_target - np.log(rho_sum))
+	    w = w / np.sum(w)
+
+	    entropy = -1*np.sum(w * np.log(w))
+	    norm_perplexity_cur = np.exp(entropy)/i_sampler.N
+	    if (norm_perplexity - norm_perplexity_cur)**2 < i_sampler.tol:
+	        break
+
+            # update annealing term
+	    diff = np.sign(norm_perplexity - norm_perplexity_cur)
+	    if diff < 0:
+                gamma = np.maximum(gamma/2. , 1.)
+
+	    norm_perplexity = norm_perplexity_cur
+	    print('Step: {}, Perplexity: {}, Num OOB: {}'.format(cur_iter, norm_perplexity, i_sampler.countOOB(X)))
+
+            # update proposal model parameters; in our case it is the alpha (s), mu (s) and std (s)
+	    for c in range(i_sampler.n_components):
+	        tmp = w * rho[c]
+	        i_sampler.alpha_p[c] = np.sum(tmp)
+	        i_sampler.mu_p[c] = np.sum(X.transpose() * tmp, axis = 1) / i_sampler.alpha_p[c]
+	        cov_mats = np.array([np.outer(x,x) for x in (X - i_sampler.mu_p[c])])
+	        i_sampler.std_p[c] =  np.sum(cov_mats * tmp[:,np.newaxis, np.newaxis], axis = 0) / i_sampler.alpha_p[c]
+
+	    cur_iter += 1
+
+        end_time = time.time()
+        print('Time elapsed: {}'.format(end_time - start_time))
+
+        print('Predicted variances from the reverse model: {}'.format(std_initial))
+        post_idx = np.random.choice(w.shape[0], p=w, replace=True, size = 100000)
+        posterior_samples = X[post_idx, :]
+        print ('Covariance matrix: {}'.format(np.around(np.cov(posterior_samples.transpose()),decimals=6)))
+        print ('Correlation matrix: {}'.format(np.around(np.corrcoef(posterior_samples.transpose()),decimals=6)))
+
+        results = {'mu_initial': mu_initial, 'std_initial':std_initial, 'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p}
+        pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_bg_stn_sample_{}_model_{}.pickle'.format(sample,cfg.refname)),'wb'))
+
 
 def main():
-    nsamples = 6
-    run(sample=3)
+    #nsamples = 6
+    run_batch(nsample=6)
 
 if __name__ == '__main__':
     main()
