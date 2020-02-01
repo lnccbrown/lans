@@ -9,6 +9,7 @@ import config
 import tensorflow as tf
 import pandas as pd
 import time
+import argparse
 
 class ImportanceSampler:
     def __getitem__(self, item):
@@ -280,31 +281,36 @@ def run(datafile='../data/bg_stn/bg_stn_binned.pickle', sample=0):
     results = {'mu_initial': mu_initial, 'std_initial':std_initial, 'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p}
     pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_bg_stn_sample_{}_model_{}'.format(sample,cfg.refname)),'wb'))
 
-def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6):
-    
+def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=None, nbin=None, N=None):
+    #import ipdb; ipdb.set_trace()
     # load in the configurations
-    cfg = config.Config()
+    cfg = config.Config(model=model, bins=nbin, N=N)
 
     # initialize the importance sampler
-    i_sampler = ImportanceSampler(cfg, max_iters=75, tol=1e-6, nsamples=500000)
+    i_sampler = ImportanceSampler(cfg, max_iters=75, tol=1e-6, nsamples=1000000)
     
-    for sample in range(nsample):
+    for sample in range(1,nsample):
         # let's choose the dataset for which we'll try to get posteriors
         my_data = pickle.load(open(datafile ,'rb'))
         data = my_data[0][sample]
         data_norm = data / data.sum()
-    
+	
+	#my_data = pickle.load(open(cfg.inference_dataset[0],'rb'))
+	#dataset_idx = np.random.randint(100)    
+	#data_norm = my_data[1][sample][dataset_idx]
+	#data = data_norm * N
+
         # get an initial point estimate
         mu_initial, std_initial = i_sampler.getPointEstimate(data_norm)
  
         # Initializing the mixture
-        i_sampler.initializeMoG(mu_initial, std_initial, n_components=5, mu_perturbation=(-1., 1.), spread=10.)
+        i_sampler.initializeMoG(mu_initial, std_initial, n_components=8, mu_perturbation=(-2., 2.), spread=10.)
 
         # convergence metric
         norm_perplexity, cur_iter = -1.0, 0.
 
         # annealing factor
-        gamma = 64.
+        gamma = 16. #64.
 
         start_time = time.time()
         while (cur_iter < i_sampler.max_iters):
@@ -338,7 +344,7 @@ def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6):
                 gamma = np.maximum(gamma/2. , 1.)
 
 	    norm_perplexity = norm_perplexity_cur
-	    print('Step: {}, Perplexity: {}, Num OOB: {}'.format(cur_iter, norm_perplexity, i_sampler.countOOB(X)))
+	    print('Step: {}, Perplexity: {}, Num OOB: {}, gamma: {}'.format(cur_iter, norm_perplexity, i_sampler.countOOB(X), gamma))
 
             # update proposal model parameters; in our case it is the alpha (s), mu (s) and std (s)
 	    for c in range(i_sampler.n_components):
@@ -360,12 +366,22 @@ def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6):
         print ('Correlation matrix: {}'.format(np.around(np.corrcoef(posterior_samples.transpose()),decimals=6)))
 
         results = {'mu_initial': mu_initial, 'std_initial':std_initial, 'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p}
+	#results = {'mu_initial': mu_initial, 'std_initial':std_initial, 'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p, 'gt_params':my_data[0][dataset_idx]}
+
         pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_bg_stn_sample_{}_model_{}.pickle'.format(sample,cfg.refname)),'wb'))
+        #pickle.dump(results, open(os.path.join(cfg.results_dir, 'IS_model_{}_N_{}_idx_{}.pickle'.format(cfg.refname,N,dataset_idx)),'wb'))
 
 
-def main():
-    #nsamples = 6
-    run_batch(nsample=6)
+#def main():
+#   #nsamples = 6
+#    run_batch(nsample=2)
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', type=str)
+    parser.add_argument('--nbin', type=int)
+    parser.add_argument('--N', type=int)
+    args = parser.parse_args()
+    run_batch(nsample=6, model=args.model, nbin=args.nbin, N=args.N)
+
+    #main()

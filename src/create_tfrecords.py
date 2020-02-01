@@ -12,7 +12,7 @@ def main(
 ):
     data_prop = config.data_prop
     all_features, all_labels = [], []
-
+    #import ipdb; ipdb.set_trace()
     # get the listing of files
     data_files = glob.glob(os.path.join(
 				data_folder,

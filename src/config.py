@@ -14,7 +14,7 @@ class Config(object):
 	# training dataset features
 	self.isBinned = True
 	if model is None:
-	    model = 'ornstein'
+	    model = 'race_model_4'
 	if bins != None:
 	    self.nBins = bins
 	else:
