@@ -10,6 +10,7 @@ import tensorflow as tf
 #import pandas as pd
 import time
 import argparse
+import math
 
 class ImportanceSampler:
     def __getitem__(self, item):
@@ -75,7 +76,7 @@ class ImportanceSampler:
 	self.saver1.restore(self.inv_sess, ckpts)
 
     def initializeMoG(self, mu_initial, std_initial, n_components=3, mu_perturbation=(-2., 2.), spread=10.):
-        
+        padding = 0.2
 	n_dims = mu_initial.shape[0]
 	# set the inital component weights
 	alpha_p = np.random.randint(low=1, high=n_components-1, size=n_components).astype(np.float32)
@@ -87,12 +88,36 @@ class ImportanceSampler:
 	std_p = np.zeros((n_components, n_dims, n_dims))
 
 	# set the first component right on the point estimate
-	mu_p[0] = mu_initial
+	for k in range(n_dims):
+	    if mu_initial[k] > self.cfg.bounds[k][1]:
+		mu_p[0][k] = self.cfg.bounds[k][1] - padding
+	    elif mu_initial[k] < self.cfg.bounds[k][0]:
+		mu_p[0][k] = self.cfg.bounds[k][0] + padding
+	    else:
+		mu_p[0][k] = mu_initial[k]
+	#mu_p[0] = mu_initial
 	std_p[0] = np.diag(std_initial)
 
 	# initialize the other components by perturbing them a little bit around the point estimate
+	# Here we need to make sure that the centers aren't outside the appropriate bounds
 	for c in range(1, n_components):
-            mu_p[c] = mu_p[0] + np.random.uniform(low=mu_perturbation[0], high=mu_perturbation[1], size=n_dims)*std_initial
+            #mu_p[c] = mu_p[0] + np.random.uniform(low=mu_perturbation[0], high=mu_perturbation[1], size=n_dims)*std_initial
+	    sample_goodness = False
+	    sample_again = False
+	    attempts = 0
+	    while not(sample_goodness) and (attempts < 100):
+		new_mu = mu_p[0] + np.random.uniform(low=mu_perturbation[0], high=mu_perturbation[1], size=n_dims)*std_initial
+		for k in range(n_dims):
+		    if ((new_mu[k] < self.cfg.bounds[k][0]) | (new_mu[k] > self.cfg.bounds[k][1])):
+			sample_again = True
+			break
+		if sample_again:
+		    sample_goodness = False
+		    attempts = attempts + 1
+		else :
+		    sample_goodness = True
+
+	    mu_p[c] = new_mu
             std_p[c] = spread * std_p[0]
         
 	# set the members
@@ -192,6 +217,7 @@ def plotMarginals(posterior_samples, params, filename):
     plt.savefig(filename)
     plt.show()    
 
+'''
 def run(datafile='../data/bg_stn/bg_stn_binned.pickle', sample=0):
     #import ipdb; ipdb.set_trace()
     # let's choose the dataset for which we'll try to get posteriors
@@ -280,6 +306,7 @@ def run(datafile='../data/bg_stn/bg_stn_binned.pickle', sample=0):
 
     results = {'mu_initial': mu_initial, 'std_initial':std_initial, 'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p}
     pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_bg_stn_sample_{}_model_{}'.format(sample,cfg.refname)),'wb'))
+'''
 
 def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=None, nbin=None, N=None):
     # load in the configurations
@@ -287,7 +314,7 @@ def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=N
     #datafile = cfg.inference_dataset
 
     # initialize the importance sampler
-    i_sampler = ImportanceSampler(cfg, max_iters=50, tol=1e-6, nsamples=100000)
+    i_sampler = ImportanceSampler(cfg, max_iters=50, tol=1e-6, nsamples=200000)
     
     #for sample in range(1,nsample):
     for sample in [nsample]:
@@ -302,18 +329,20 @@ def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=N
 	dataset_idx = sample
 	data_norm = my_data[1][0][dataset_idx] # index by 'sample'
 	data = data_norm * N
-
         # get an initial point estimate
         mu_initial, std_initial = i_sampler.getPointEstimate(data_norm)
  
         # Initializing the mixture
-        i_sampler.initializeMoG(mu_initial, std_initial, n_components=8, mu_perturbation=(-0.5, 0.5), spread=10.)
+        i_sampler.initializeMoG(mu_initial, std_initial, n_components=12, mu_perturbation=(-.5, .5), spread=10.)
 
         # convergence metric
         norm_perplexity, cur_iter = -1.0, 0.
 
         # annealing factor
         gamma = 8. #64.
+
+	# nan counter
+	nan_counter = 0
 
         start_time = time.time()
         while (cur_iter < i_sampler.max_iters):
@@ -338,7 +367,11 @@ def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=N
 
 	    entropy = -1*np.sum(w * np.log(w))
 	    norm_perplexity_cur = np.exp(entropy)/i_sampler.N
-	    if (norm_perplexity - norm_perplexity_cur)**2 < i_sampler.tol:
+
+	    if math.isnan(norm_perplexity) and math.isnan(norm_perplexity_cur):
+		nan_counter = nan_counter + 1
+
+	    if ((norm_perplexity - norm_perplexity_cur)**2 < i_sampler.tol) or ( (norm_perplexity >= 0.8) and ( (norm_perplexity - norm_perplexity_cur)**2 < 1e-3) ) or (nan_counter > 8):
 	        break
 
             # update annealing term

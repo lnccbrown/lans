@@ -14,11 +14,11 @@ class Config(object):
 	# training dataset features
 	self.isBinned = True
 	if model is None:
-	    model = 'race_model_4'
+	    model = 'ddm_mic2'
 	if bins != None:
 	    self.nBins = bins
 	else:
-	    self.nBins = 256
+	    self.nBins = 512
 	self.nDatapoints = 100000
 
 	if N != None:
@@ -27,8 +27,11 @@ class Config(object):
 	    self.N = 1024
 
 	self.method_options = {'ddm': self.ddm_initialize, 'angle': self.angle_initialize, 'weibull': self.weibull_initialize, 'ornstein': self.ornstein_initialize,
-			'fullddm': self.full_ddm_initialize, 'race_model_3': self.race_model_3_initialize, 'race_model_4': self.race_model_4_initialize,
-			'lca_3': self.lca_3_initialize, 'lca_4': self.lca_4_initialize}
+			'fullddm': self.full_ddm_initialize, 'race_model_3': self.race_model_3_initialize, 'race_model_4': self.race_model_4_initialize,'race_model_6':self.race_model_6_initialize,
+			'lca_3': self.lca_3_initialize, 'lca_4': self.lca_4_initialize,
+			'ddm_seq2': self.ddm_seq2_initialize,
+			'ddm_par2': self.ddm_par2_initialize,
+			'ddm_mic2': self.ddm_mic2_initialize}
 
 	# select model
 	self.method_options[model](self.nBins)
@@ -114,6 +117,30 @@ class Config(object):
 	self.output_hist_dims = [None, 1, nbins, 2]
 	self.bounds = [(-2.5, 2.5), (0.2, 2.0), (0.1, 0.9), (-1.0, 1.0), (0.0, 2.0)]
 
+    def ddm_seq2_initialize(self, nbins):
+	self.model_name = 'ddm_seq2'
+	self.dataset = 'ddm_seq2_nchoices*'
+	self.param_dims = [None, 1, 8, 1]
+	self.test_param_dims = [1, 1, 8, 1]
+	self.output_hist_dims = [None, 1, nbins, 4]
+	self.bounds = [(-2.5, 2.5), (-2.5, 2.5), (-2.5, 2.5),(0.2, 2), (0.1, 0.9), (0.1, 0.9), (0.1, 0.9), (0.0, 2.0)]
+
+    def ddm_par2_initialize(self, nbins):
+	self.model_name = 'ddm_par2'
+	self.dataset = 'ddm_par2_nchoices*'
+	self.param_dims = [None, 1, 8, 1]
+	self.test_param_dims = [1, 1, 8, 1]
+	self.output_hist_dims = [None, 1, nbins, 4]
+	self.bounds = [(-2.5, 2.5), (-2.5, 2.5), (-2.5, 2.5),(0.2, 2), (0.1, 0.9), (0.1, 0.9), (0.1, 0.9), (0.0, 2.0)]
+
+    def ddm_mic2_initialize(self, nbins):
+	self.model_name = 'ddm_mic2'
+	self.dataset = 'ddm_mic2_nchoices*'
+	self.param_dims = [None, 1, 9, 1]
+	self.test_param_dims = [1, 1, 9, 1]
+	self.output_hist_dims = [None, 1, nbins, 4]
+	self.bounds = [(-2.5, 2.5), (-2.5, 2.5), (-2.5, 2.5),(0.2, 2), (0.1, 0.9), (0.1, 0.9), (0.1, 0.9), (0.0, 1.0), (0.0, 2.0)]
+
     def race_model_3_initialize(self, nbins):
 	self.model_name = 'race_model_3'
 	#self.dataset_dir = 'race_model_3'
@@ -166,13 +193,14 @@ class Config(object):
 	self.test_param_dims = [1, 1, 14, 1]
 	self.output_hist_dims = [None, 1, 256, 5]
 
-    def race_model_6_initialize(self):
+    def race_model_6_initialize(self, nbins):
 	self.model_name = 'race_model_6'
-	self.dataset_dir = 'race_model_6'
-	self.dataset = 'race_model_base*'
+	#self.dataset_dir = 'race_model_3'
+	self.dataset = 'race_model_nchoices*'
 	self.param_dims = [None, 1, 14, 1]
 	self.test_param_dims = [1, 1, 14, 1]
-	self.output_hist_dims = [None, 1, 256, 6]
+	self.output_hist_dims = [None, 1, nbins, 6]
+	self.bounds = [(0.0, 2.5), (0.0, 2.5), (0.0, 2.5), (0.0, 2.5), (0.0, 2.5), (0.0, 2.5), (1.0, 3.0), (0.1, 0.9), (0.1, 0.9), (0.1, 0.9), (0.1, 0.9), (0.1, 0.9), (0.1, 0.9), (0.0, 2.0)]
 
     def lca_6_initialize(self):
 	self.model_name = 'lca_6'
