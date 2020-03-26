@@ -21,9 +21,9 @@ def make_rec_plots(model_name='fullddm', params=None, gridshape=None):
     M = ['_'.join(x.split('_')[:-1]) + '_%06d'%int(x.split('_')[-1].split('.')[0]) + '.pickle' for x in my_files]
     M.sort()
     my_files = ['_'.join(x.split('_')[:-1]) + '_%d'%int(x.split('_')[-1].split('.')[0]) + '.pickle' for x in M]
-    my_files = my_files[-200:]
+    my_files = my_files #[-200:]
     #####
-    '''
+    
     time_to_convergence = []
     true_params, rec_params = [], []
     eff_samples = []
@@ -51,7 +51,7 @@ def make_rec_plots(model_name='fullddm', params=None, gridshape=None):
 
     np.save('true_{}.npy'.format(model_name), A)
     np.save('rec_{}.npy'.format(model_name) , B)
-    '''
+    
     A = np.load('true_{}.npy'.format(model_name))
     B = np.load('rec_{}.npy'.format(model_name))
 
@@ -75,7 +75,7 @@ def make_rec_plots(model_name='fullddm', params=None, gridshape=None):
 
 if __name__ == '__main__':
     #import ipdb; ipdb.set_trace()
-    make_rec_plots(model_name='ddm_seq2',params=['v_h', 'v_l1', 'v_l2', 'a', 'w_h', 'w_l1', 'w_l2', 'ndt'], gridshape=[3,3])
+    make_rec_plots(model_name='ddm_par2',params=['v_h', 'v_l1', 'v_l2', 'a', 'w_h', 'w_l1', 'w_l2', 'ndt'], gridshape=[3,3])
     #make_rec_plots(model_name='ornstein',params=['v', 'a', 'w', 'g', 'ndt'], gridshape=[3,2])
     #make_rec_plots(model_name='weibull',params=['v', 'a', 'w','ndt','alpha','beta'], gridshape=[3,2])
     #make_rec_plots(model_name='race_model_4',params=['v1','v2','v3', 'v4' , 'a', 'w1','w2', 'w3', 'w4','ndt'], gridshape=[3,4])

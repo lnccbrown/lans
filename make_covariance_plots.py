@@ -38,10 +38,10 @@ plt.show()
 plt.close()
 '''
 
-X = pickle.load(open('/media/data_cifs/lakshmi/projectABC/results/cogsci/IS_model_ddm_seq2_training_data_binned_1_nbins_512_n_100000_N_1024_idx_20.pickle','rb'))
+X = pickle.load(open('/media/data_cifs/lakshmi/projectABC/results/cogsci/IS_model_ddm_mic2_training_data_binned_1_nbins_512_n_100000_N_1024_idx_171.pickle','rb'))
 print(X['norm_perplexity'])
-df = pd.DataFrame(X['posterior_samples'][:10000,:], columns=['v_h', 'v_l1', 'v_l2', 'a', 'w_h', 'w_l1', 'w_l2','ndt'])
+df = pd.DataFrame(X['posterior_samples'][:10000,:], columns=['v_h', 'v_l1', 'v_l2', 'a', 'w_h', 'w_l1', 'w_l2', 'd', 'ndt'])
 pd.scatter_matrix(df, figsize=(6,6), alpha=0.01, diagonal='kde', density_kwds={'color':'black'}, c='gray')
-plt.savefig('cov_ddm_seq2.png',dpi=100)
+plt.savefig('cov_ddm_mic2.png',dpi=100)
 plt.close()
 
