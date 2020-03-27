@@ -128,7 +128,7 @@ class ImportanceSampler:
 	self.mu_p = mu_p
 	self.std_p = std_p
 	# degrees of freedom -- change this later
-	self.degrees_p = np.zeros_like(alpha_p) + 1
+	self.degrees_p = np.zeros_like(alpha_p) + 1 + np.random.randint(10)
 
     def klDivergence(self, x, y, eps1=1e-7, eps2=1e-30):
 	return np.sum(x * np.log(eps2 + x/(y+eps1)))
@@ -470,7 +470,7 @@ def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=N
 	results = {'mu_initial': mu_initial, 'std_initial':std_initial, 'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p, 'gt_params':my_data[0][dataset_idx], 'timeToConvergence':end_time-start_time, 'norm_perplexity':norm_perplexity}
 
         #pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_bg_stn_sample_{}_model_{}.pickle'.format(sample,cfg.refname)),'wb'))
-        pickle.dump(results, open(os.path.join(cfg.results_dir, 'cogsci/IS_model_{}_N_{}_idx_{}.pickle'.format(cfg.refname,N,dataset_idx)),'wb'))
+        pickle.dump(results, open(os.path.join(cfg.results_dir, 'cogsci/IS_model_{}_N_{}_idx_{}_a.pickle'.format(cfg.refname,N,dataset_idx)),'wb'))
 
 
 #def main():
