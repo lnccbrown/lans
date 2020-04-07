@@ -35,7 +35,7 @@ class ImportanceSampler:
 	self.cfg = config
 	self.target = []
 
-	self.inf_batch_size = 25000
+	self.inf_batch_size = 50000
 
 	# placeholder for forward model
 	self.forward_model_inpdims = [self.inf_batch_size] + self.cfg.param_dims[1:]
@@ -386,7 +386,7 @@ def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=N
         mu_initial, std_initial = i_sampler.getPointEstimate(data_norm)
  
         # Initializing the mixture
-        i_sampler.initializeMoT(mu_initial, std_initial, n_components=12, mu_perturbation=(-.5, .5), spread=10.)
+        i_sampler.initializeMoT(mu_initial, std_initial, n_components=24, mu_perturbation=(-.5, .5), spread=10.)
 
         # convergence metric
         norm_perplexity, cur_iter = -1.0, 0.
@@ -398,6 +398,7 @@ def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=N
 	nan_counter = 0
 
         start_time = time.time()
+	current_iter = 0
         while (cur_iter < i_sampler.max_iters):
 
 	    # sample parameters from the proposal distribution
@@ -418,15 +419,15 @@ def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=N
 	    w = np.exp(log_target - np.log(rho_sum))
 	    w = w / np.sum(w)
 
-	    entropy = -1*np.sum(w * np.log(w))
+	    entropy = -1*np.sum(w * np.log(w + 1e-30))
 	    norm_perplexity_cur = np.exp(entropy)/i_sampler.N
 
 	    if math.isnan(norm_perplexity) and math.isnan(norm_perplexity_cur):
 		nan_counter = nan_counter + 1
 
-	    if ((norm_perplexity - norm_perplexity_cur)**2 < i_sampler.tol) or ( (norm_perplexity >= 0.8) and ( (norm_perplexity - norm_perplexity_cur)**2 < 1e-3) ) or (nan_counter > 8):
+	    if ( current_iter > 5) and (((norm_perplexity - norm_perplexity_cur)**2 < i_sampler.tol) or ( (norm_perplexity >= 0.8) and ( (norm_perplexity - norm_perplexity_cur)**2 < 1e-3) ) or (nan_counter > 8)):
 	        break
-
+	    current_iter += 1
             # update annealing term
 	    diff = np.sign(norm_perplexity - norm_perplexity_cur)
 	    if diff < 0:
@@ -470,7 +471,7 @@ def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=N
 	results = {'mu_initial': mu_initial, 'std_initial':std_initial, 'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p, 'gt_params':my_data[0][dataset_idx], 'timeToConvergence':end_time-start_time, 'norm_perplexity':norm_perplexity}
 
         #pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_bg_stn_sample_{}_model_{}.pickle'.format(sample,cfg.refname)),'wb'))
-        pickle.dump(results, open(os.path.join(cfg.results_dir, 'cogsci/IS_model_{}_N_{}_idx_{}_a.pickle'.format(cfg.refname,N,dataset_idx)),'wb'))
+        pickle.dump(results, open(os.path.join(cfg.results_dir, 'benchmark_exps/IS_model_{}_N_{}_idx_{}_tdistribution.pickle'.format(cfg.refname,N,dataset_idx)),'wb'))
 
 
 #def main():

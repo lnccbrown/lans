@@ -14,7 +14,7 @@ class Config(object):
 	# training dataset features
 	self.isBinned = True
 	if model is None:
-	    model = 'ddm_mic2'
+	    model = 'levy'
 	if bins != None:
 	    self.nBins = bins
 	else:
@@ -31,7 +31,8 @@ class Config(object):
 			'lca_3': self.lca_3_initialize, 'lca_4': self.lca_4_initialize,
 			'ddm_seq2': self.ddm_seq2_initialize,
 			'ddm_par2': self.ddm_par2_initialize,
-			'ddm_mic2': self.ddm_mic2_initialize}
+			'ddm_mic2': self.ddm_mic2_initialize,
+			'levy': self.levy_initialize}
 
 	# select model
 	self.method_options[model](self.nBins)
@@ -210,3 +211,11 @@ class Config(object):
 	self.test_param_dims = [1, 1, 16, 1]
 	self.output_hist_dims = [None, 1, 256, 6]
 
+    def levy_initialize(self, nbins):
+	self.model_name = 'levy'
+	#self.dataset_dir = 'race_model_3'
+	self.dataset = 'levy_nchoices*'
+	self.param_dims = [None, 1, 5, 1]
+	self.test_param_dims = [1, 1, 5, 1]
+	self.output_hist_dims = [None, 1, nbins, 2]
+	self.bounds = [(-2.5, 2.5), (0.2, 2), (0.1, 0.9), (1.0, 2.0), (0.0, 2.0)]

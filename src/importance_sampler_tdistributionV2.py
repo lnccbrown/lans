@@ -1,5 +1,4 @@
 import numpy as np
-from scipy import stats
 import matplotlib.pyplot as plt
 import tqdm, pickle, os, time
 from mpl_toolkits.mplot3d import Axes3D
@@ -11,6 +10,8 @@ import tensorflow as tf
 import time
 import argparse
 import math
+from math import *
+from scipy import linalg
 
 class ImportanceSampler:
     def __getitem__(self, item):
@@ -50,6 +51,7 @@ class ImportanceSampler:
 	    self.gpuconfig.gpu_options.allow_growth = True
 	    self.gpuconfig.allow_soft_placement = True
 	    self.saver = tf.train.Saver()
+	
 	self.forward_sess = tf.Session(config=self.gpuconfig)
 	ckpts = tf.train.latest_checkpoint(self.cfg.model_output)
 	self.saver.restore(self.forward_sess, ckpts)
@@ -74,7 +76,7 @@ class ImportanceSampler:
 )
 	self.saver1.restore(self.inv_sess, ckpts)
 
-    def initializeMoG(self, mu_initial, std_initial, n_components=3, mu_perturbation=(-2., 2.), spread=10.):
+    def initializeMoT(self, mu_initial, std_initial, n_components=3, mu_perturbation=(-2., 2.), spread=10.):
         padding = 0.2
 	n_dims = mu_initial.shape[0]
 	# set the inital component weights
@@ -124,6 +126,8 @@ class ImportanceSampler:
 	self.alpha_p = alpha_p
 	self.mu_p = mu_p
 	self.std_p = std_p
+	# degrees of freedom -- change this later
+	self.degrees_p = np.zeros_like(alpha_p) + 1 + np.random.randint(10)
 
     def klDivergence(self, x, y, eps1=1e-7, eps2=1e-30):
 	return np.sum(x * np.log(eps2 + x/(y+eps1)))
@@ -163,8 +167,56 @@ class ImportanceSampler:
     '''
 
     def evalProposalByComponent(self, x, component):
-        return stats.multivariate_normal.pdf(x, mean=self.mu_p[component], cov=self.std_p[component])
-    
+        #return stats.multivariate_normal.pdf(x, mean=self.mu_p[component], cov=self.std_p[component])
+	return self.multivariate_t_distribution(x, self.mu_p[component], self.std_p[component], self.degrees_p[component], self.mu_p[component].shape[0])
+
+    def multivariate_t_rvs(self, m, S, df=np.inf, n=1):
+        '''generate random variables of multivariate t distribution
+        Parameters
+        ----------
+        m : array_like
+        mean of random variable, length determines dimension of random variable
+        S : array_like
+        square array of covariance  matrix
+        df : int or float
+        degrees of freedom
+        n : int
+        number of observations, return random array will be (n, len(m))
+        Returns
+        -------
+        rvs : ndarray, (n, len(m))
+           each row is an independent draw of a multivariate t distributed
+           random variable
+        '''
+        m = np.asarray(m)
+        d = len(m)
+        if df == np.inf:
+            x = 1.
+        else:
+            x = np.random.chisquare(df, n)/df
+        z = np.random.multivariate_normal(np.zeros(d),S,(n,))
+        return m + z/np.sqrt(x)[:,None]   # same output format as random.multivariate_normal
+
+    def multivariate_t_distribution(self, x,mu,Sigma,df,d):
+        '''
+        Multivariate t-student density:
+        output:
+            the density of the given element
+        input:
+            x = parameter (d dimensional numpy array or scalar)
+            mu = mean (d dimensional numpy array or scalar)
+            Sigma = scale matrix (dxd numpy array)
+            df = degrees of freedom
+            d: dimension
+        '''
+	#import ipdb; ipdb.set_trace()
+        Num = gamma(1. * (d+df)/2)
+	inv_sqrt_sigma = np.linalg.inv(linalg.sqrtm(Sigma))
+        #Denom = ( gamma(1.*df/2) * pow(df*pi,1.*d/2) * pow(np.linalg.det(Sigma),1./2) * pow(1 + (1./df)*np.dot(np.dot((x - mu),np.linalg.inv(Sigma)), (x - mu)),1.* (d+df)/2))
+        Denom = ( gamma(1.*df/2) * np.power(df*pi,1.*d/2) * np.power(np.linalg.det(Sigma),1./2) * np.power(1 + (1./df)*np.sum(np.square(np.dot(x-mu, inv_sqrt_sigma)), axis=-1),1.* (d+df)/2))
+	d = 1. * Num / Denom 
+        return d
+ 
     def generateFromProposal(self):
 
 	samples = np.array([])
@@ -181,7 +233,8 @@ class ImportanceSampler:
             for c in range(self.n_components):
                 if c >= unique_counts.shape[0]:
 	            continue
- 	        cur_samps = np.random.multivariate_normal(size = unique_counts[c], mean = self.mu_p[c], cov = self.std_p[c])
+ 	        #import ipdb; ipdb.set_trace()
+		cur_samps = self.multivariate_t_rvs(self.mu_p[c], self.std_p[c], df=self.degrees_p[c], n=unique_counts[c])
 	        if c == 0:
 	            iter_samples = cur_samps
 	        else:
@@ -307,7 +360,7 @@ def run(datafile='../data/bg_stn/bg_stn_binned.pickle', sample=0):
     pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_bg_stn_sample_{}_model_{}'.format(sample,cfg.refname)),'wb'))
 '''
 
-def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=None, nbin=None, N=None):
+def run_batch(datafile='../data/chong/chong_full_cnn_coh.pickle', nsample=6, model=None, nbin=None, N=None):
     # load in the configurations
     cfg = config.Config(model=model, bins=nbin, N=N)
     #datafile = cfg.inference_dataset
@@ -318,27 +371,27 @@ def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=N
     #for sample in range(1,nsample):
     for sample in [nsample]:
         # let's choose the dataset for which we'll try to get posteriors
-        #my_data = pickle.load(open(datafile ,'rb'))
-        #data = my_data[0][sample]
-        #data_norm = data / data.sum()
+        my_data = pickle.load(open(datafile ,'rb'))
+        data = my_data[1][sample]
+        data_norm = data / data.sum()
 
-	#import ipdb; ipdb.set_trace()	
-	my_data = pickle.load(open(cfg.inference_dataset[0],'rb'))
-	#dataset_idx = np.random.randint(100)    
-	dataset_idx = sample
-	data_norm = my_data[1][0][dataset_idx] # index by 'sample'
-	data = data_norm * N
+	##import ipdb; ipdb.set_trace()	
+	#my_data = pickle.load(open(cfg.inference_dataset[0],'rb'))
+	##dataset_idx = np.random.randint(100)    
+	#dataset_idx = sample
+	#data_norm = my_data[1][0][dataset_idx] # index by 'sample'
+	#data = data_norm * N
         # get an initial point estimate
         mu_initial, std_initial = i_sampler.getPointEstimate(data_norm)
  
         # Initializing the mixture
-        i_sampler.initializeMoG(mu_initial, std_initial, n_components=12, mu_perturbation=(-.5, .5), spread=10.)
+        i_sampler.initializeMoT(mu_initial, std_initial, n_components=24, mu_perturbation=(-.5, .5), spread=10.)
 
         # convergence metric
         norm_perplexity, cur_iter = -1.0, 0.
 
         # annealing factor
-        gamma = 8. #64.
+        gamma = 64. #64.
 
 	# nan counter
 	nan_counter = 0
@@ -371,7 +424,7 @@ def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=N
 	    if math.isnan(norm_perplexity) and math.isnan(norm_perplexity_cur):
 		nan_counter = nan_counter + 1
 
-	    if (current_iter > 5) and (((norm_perplexity - norm_perplexity_cur)**2 < i_sampler.tol) or ( (norm_perplexity >= 0.8) and ( (norm_perplexity - norm_perplexity_cur)**2 < 1e-3) ) or (nan_counter > 8)):
+	    if ( current_iter > 5) and (((norm_perplexity - norm_perplexity_cur)**2 < i_sampler.tol) or ( (norm_perplexity >= 0.8) and ( (norm_perplexity - norm_perplexity_cur)**2 < 1e-3) ) or (nan_counter > 8)):
 	        break
 	    current_iter += 1
             # update annealing term
@@ -386,9 +439,21 @@ def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=N
 	    for c in range(i_sampler.n_components):
 	        tmp = w * rho[c]
 	        i_sampler.alpha_p[c] = np.sum(tmp)
-	        i_sampler.mu_p[c] = np.sum(X.transpose() * tmp, axis = 1) / i_sampler.alpha_p[c]
-	        cov_mats = np.array([np.outer(x,x) for x in (X - i_sampler.mu_p[c])])
-	        i_sampler.std_p[c] =  np.sum(cov_mats * tmp[:,np.newaxis, np.newaxis], axis = 0) / i_sampler.alpha_p[c]
+
+		p = i_sampler.mu_p[0].shape[0]
+		v_d = i_sampler.degrees_p[c]
+		z_d = X - i_sampler.mu_p[c]
+		#import ipdb; ipdb.set_trace()
+		#gamma_proposal_c = (v_d + p) / (v_d + np.dot(np.dot(z_d, np.linalg.inv(i_sampler.std_p[c])), z_d)) 
+		inv_sqrt_sigma = np.linalg.inv(linalg.sqrtm(i_sampler.std_p[c]))
+		gamma_proposal_c = (v_d + p) / (v_d + np.sum(np.square(np.dot(z_d, inv_sqrt_sigma)), axis=-1))
+
+		tmp_gamma = tmp * gamma_proposal_c
+	        i_sampler.mu_p[c] = np.sum(X.transpose() * tmp_gamma, axis = 1) / np.sum(tmp_gamma)
+	        
+		cov_mats = np.array([np.outer(x,x) for x in (X - i_sampler.mu_p[c])])
+	        #i_sampler.std_p[c] =  np.sum(cov_mats * tmp[:,np.newaxis, np.newaxis] * gamma_proposal_c, axis = 0) / i_sampler.alpha_p[c]
+	        i_sampler.std_p[c] =  np.sum(cov_mats * tmp_gamma[:,np.newaxis, np.newaxis], axis = 0) / i_sampler.alpha_p[c]
 
 	    cur_iter += 1
 
@@ -402,10 +467,10 @@ def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=N
         print ('Correlation matrix: {}'.format(np.around(np.corrcoef(posterior_samples.transpose()),decimals=6)))
 
         #results = {'mu_initial': mu_initial, 'std_initial':std_initial, 'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p}
-	results = {'mu_initial': mu_initial, 'std_initial':std_initial, 'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p, 'gt_params':my_data[0][dataset_idx], 'timeToConvergence':end_time-start_time, 'norm_perplexity':norm_perplexity}
+	results = {'mu_initial': mu_initial, 'std_initial':std_initial, 'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p, 'timeToConvergence':end_time-start_time, 'norm_perplexity':norm_perplexity}
 
-        #pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_bg_stn_sample_{}_model_{}.pickle'.format(sample,cfg.refname)),'wb'))
-        pickle.dump(results, open(os.path.join(cfg.results_dir, 'benchmark_exps/IS_model_{}_N_{}_idx_{}.pickle'.format(cfg.refname,N,dataset_idx)),'wb'))
+        pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_chong_sample_{}_model_{}.pickle'.format(sample,cfg.refname)),'wb'))
+        #pickle.dump(results, open(os.path.join(cfg.results_dir, 'benchmark_exps/IS_model_{}_N_{}_idx_{}_tdistribution.pickle'.format(cfg.refname,N,dataset_idx)),'wb'))
 
 
 #def main():

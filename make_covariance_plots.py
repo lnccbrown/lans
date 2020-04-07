@@ -38,23 +38,35 @@ plt.show()
 plt.close()
 '''
 
-#X = pickle.load(open('/media/data_cifs/lakshmi/projectABC/results/cogsci/IS_model_ddm_mic2_training_data_binned_1_nbins_512_n_100000_N_1024_idx_171.pickle','rb'))
-X = pickle.load(open('/media/data_cifs/lakshmi/projectABC/results/cogsci/IS_model_angle_training_data_binned_1_nbins_256_n_100000_N_512_idx_57.pickle','rb'))
-
-print(X['norm_perplexity'])
-df = pd.DataFrame(X['posterior_samples'][:10000,:], columns=['v','a','w', 'ndt','theta'])
-pd.scatter_matrix(df, figsize=(6,6), alpha=0.01, diagonal='kde', density_kwds={'color':'black'}, c='gray')
-#plt.savefig('cov_ddm_mic2.png',dpi=100)
-#plt.close()
-plt.show(block=False)
+'''
+model = 'race_model_6'
+idx = 43
 
 #X = pickle.load(open('/media/data_cifs/lakshmi/projectABC/results/cogsci/IS_model_ddm_mic2_training_data_binned_1_nbins_512_n_100000_N_1024_idx_171.pickle','rb'))
-X = pickle.load(open('/media/data_cifs/lakshmi/projectABC/results/cogsci/IS_model_angle_training_data_binned_1_nbins_256_n_100000_N_512_idx_57_a.pickle','rb'))
+X = pickle.load(open('/media/data_cifs/lakshmi/projectABC/results/benchmark_exps/IS_model_{}_training_data_binned_1_nbins_256_n_100000_N_1024_idx_{}_tdistribution.pickle'.format(model,idx),'rb'))
 
 print(X['norm_perplexity'])
-df = pd.DataFrame(X['posterior_samples'][:10000,:], columns=['v','a','w', 'ndt','theta'])
+df = pd.DataFrame(X['posterior_samples'][:10000,:]) #, columns=['v','a','w', 'ndt','theta'])
 pd.scatter_matrix(df, figsize=(6,6), alpha=0.01, diagonal='kde', density_kwds={'color':'black'}, c='gray')
 #plt.savefig('cov_ddm_mic2.png',dpi=100)
 #plt.close()
 plt.show()
+'''
+X = pickle.load(open('/media/data_cifs/lakshmi/projectABC/results/results_chong_sample_0_model_ddm_seq2_training_data_binned_1_nbins_512_n_100000.pickle','rb'))
 
+print(X['norm_perplexity'])
+df = pd.DataFrame(X['posterior_samples'][:10000,:]) #, columns=['v','a','w', 'ndt','theta'])
+pd.scatter_matrix(df, figsize=(6,6), alpha=0.01, diagonal='kde', density_kwds={'color':'black'}, c='gray')
+plt.show()
+
+'''
+#X = pickle.load(open('/media/data_cifs/lakshmi/projectABC/results/cogsci/IS_model_ddm_mic2_training_data_binned_1_nbins_512_n_100000_N_1024_idx_171.pickle','rb'))
+X = pickle.load(open('/media/data_cifs/lakshmi/projectABC/results/benchmark_exps/IS_model_{}_training_data_binned_1_nbins_256_n_100000_N_1024_idx_{}.pickle'.format(model,idx),'rb'))
+
+print(X['norm_perplexity'])
+df = pd.DataFrame(X['posterior_samples'][:10000,:]) #, columns=['v','a','w', 'ndt','theta'])
+pd.scatter_matrix(df, figsize=(6,6), alpha=0.01, diagonal='kde', density_kwds={'color':'black'}, c='gray')
+#plt.savefig('cov_ddm_mic2.png',dpi=100)
+#plt.close()
+plt.show()
+'''
