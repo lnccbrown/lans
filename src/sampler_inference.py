@@ -162,6 +162,7 @@ class ImportanceSampler:
 	mu_p = np.zeros((n_components, n_dims))
 	std_p = np.zeros((n_components, n_dims, n_dims))
 
+        #import ipdb; ipdb.set_trace()
 	print('Initializing proposal distributions...')
 	for c in tqdm.tqdm(range(n_components)):
 	    output = differential_evolution(self.objectivefn, self.cfg.bounds)
@@ -187,8 +188,8 @@ class ImportanceSampler:
     def likelihood(self, x, y, gamma, eps=1e-7):
 	return np.sum(np.log(x+eps)*y/gamma, axis=1)
 
-    def MLELikelihood(self, x, y, eps=1e-7):
-        return np.sum(-np.log(x+eps)*y)
+    def MLELikelihood(self, x, y, gamma=8, eps=1e-7):
+        return np.sum(-np.log(x+eps)*y/gamma)
 
     '''
     feed forward through the inverse model to get a point estimate of the parameters that could've generated a given dataset
@@ -373,7 +374,7 @@ def run(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=None, n
  
         # Initializing the mixture
         #i_sampler.initializeMixtures(mu_initial, std_initial, n_components=12, mu_perturbation=(-.5, .5), spread=10., tdist=tdist)
-	i_sampler.initializeMixturesMLE(data_norm, n_components=12, tdist=tdist)
+	i_sampler.initializeMixturesMLE(data, n_components=12, tdist=tdist)
 
         # convergence metric
         norm_perplexity, cur_iter = -1.0, 0.
@@ -381,6 +382,7 @@ def run(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=None, n
         # annealing factor
         gamma = 8. #64.
 
+        import ipdb; ipdb.set_trace()
 	# nan counter
 	nan_counter = 0
 
