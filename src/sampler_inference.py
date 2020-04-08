@@ -13,6 +13,9 @@ import argparse
 import math
 from math import *
 from scipy import linalg
+from scipy.optimize import differential_evolution
+import numdifftools as nd
+import tqdm
 
 class ImportanceSampler:
     def __getitem__(self, item):
@@ -45,7 +48,9 @@ class ImportanceSampler:
 	self.inf_batch_size = 50000
 
 	# placeholder for forward model
-	self.forward_model_inpdims = [self.inf_batch_size] + self.cfg.param_dims[1:]
+	#self.forward_model_inpdims = [self.inf_batch_size] + self.cfg.param_dims[1:]
+	self.forward_model_inpdims = [None] + self.cfg.param_dims[1:]
+
 	self.forward_input = tf.placeholder(tf.float32, self.forward_model_inpdims)
 	self.forward_initialized = False
 
@@ -63,6 +68,7 @@ class ImportanceSampler:
 	ckpts = tf.train.latest_checkpoint(self.cfg.model_output)
 	self.saver.restore(self.forward_sess, ckpts)
 
+	'''
 	# placeholder for inverse model
 	self.inv_model_inpdims = [1] + self.cfg.output_hist_dims[1:]
 	self.inv_input = tf.placeholder(tf.float32, self.inv_model_inpdims)
@@ -82,6 +88,11 @@ class ImportanceSampler:
 	ckpts = tf.train.latest_checkpoint(os.path.join(self.cfg.base_dir, 'models', 'rev_'+self.cfg.model_name+'_training_data_binned_{}_nbins_{}_n_{}'.format(int(self.cfg.isBinned),self.cfg.nBins,self.cfg.nDatapoints))
 )
 	self.saver1.restore(self.inv_sess, ckpts)
+	'''
+    def objectivefn(self, params):
+	#import ipdb; ipdb.set_trace()
+	pred_data = self.forward_sess.run(self.forward_model.output, feed_dict={self.forward_input:params.reshape(self.cfg.test_param_dims)})
+	return self.MLELikelihood(pred_data[0], self.target) 
 
     def initializeMixtures(self, mu_initial, std_initial, n_components=3, mu_perturbation=(-2., 2.), spread=10., tdist=False):
         padding = 0.2
@@ -138,11 +149,46 @@ class ImportanceSampler:
 	if tdist:
 	    self.degrees_p = np.zeros_like(alpha_p) + 1 + np.random.randint(10)
 
+    def initializeMixturesMLE(self, dataset, n_components=3, tdist=False):
+	self.target = dataset.reshape((-1,))
+	hessianfn = nd.Hessian(self.objectivefn)
+
+	n_dims = len(self.cfg.bounds)
+	# set the inital component weights
+	alpha_p = np.random.randint(low=1, high=n_components-1, size=n_components).astype(np.float32)
+	alpha_p = alpha_p / alpha_p.sum()
+
+	# initialize the mu and sigma
+	mu_p = np.zeros((n_components, n_dims))
+	std_p = np.zeros((n_components, n_dims, n_dims))
+
+	print('Initializing proposal distributions...')
+	for c in tqdm.tqdm(range(n_components)):
+	    output = differential_evolution(self.objectivefn, self.cfg.bounds)
+	    mu_p[c,:] = output.x
+	    H = hessianfn(output.x)
+	    #std_p[c,:,:] = np.multiply(np.linalg.inv(H), np.eye(H.shape[0])) 
+	    std_p[c,:,:] = H
+
+	# set the members
+        self.n_components = n_components
+	self.alpha_p = alpha_p
+	self.mu_p = mu_p
+	self.std_p = std_p
+
+	# initialize the degrees of freedom of the T proposals
+	if tdist:
+	    self.degrees_p = np.zeros_like(alpha_p) + 1 + np.random.randint(10)
+
+
     def klDivergence(self, x, y, eps1=1e-7, eps2=1e-30):
 	return np.sum(x * np.log(eps2 + x/(y+eps1)))
 
     def likelihood(self, x, y, gamma, eps=1e-7):
 	return np.sum(np.log(x+eps)*y/gamma, axis=1)
+
+    def MLELikelihood(self, x, y, eps=1e-7):
+        return np.sum(-np.log(x+eps)*y)
 
     '''
     feed forward through the inverse model to get a point estimate of the parameters that could've generated a given dataset
@@ -233,7 +279,6 @@ class ImportanceSampler:
         return samples[:self.N,:]
 
 
-
     def getOOBIndices(self, x):
 	v = np.zeros((x.shape[0],), dtype=bool)
 	for k in range(x.shape[1]):
@@ -299,7 +344,7 @@ def plotMarginals(posterior_samples, params, filename):
     plt.savefig(filename)
     plt.show()    
 
-def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=None, nbin=None, N=None, proposal=None):
+def run(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=None, nbin=None, N=None, proposal=None):
     # load in the configurations
     cfg = config.Config(model=model, bins=nbin, N=N)
     #datafile = cfg.inference_dataset
@@ -322,11 +367,13 @@ def run_batch(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=N
 	dataset_idx = sample
 	data_norm = my_data[1][0][dataset_idx] # index by 'sample'
 	data = data_norm * N
+
         # get an initial point estimate
-        mu_initial, std_initial = i_sampler.getPointEstimate(data_norm)
+        #mu_initial, std_initial = i_sampler.getPointEstimate(data_norm)
  
         # Initializing the mixture
-        i_sampler.initializeMixtures(mu_initial, std_initial, n_components=12, mu_perturbation=(-.5, .5), spread=10., tdist=tdist)
+        #i_sampler.initializeMixtures(mu_initial, std_initial, n_components=12, mu_perturbation=(-.5, .5), spread=10., tdist=tdist)
+	i_sampler.initializeMixturesMLE(data_norm, n_components=12, tdist=tdist)
 
         # convergence metric
         norm_perplexity, cur_iter = -1.0, 0.
@@ -422,4 +469,4 @@ if __name__ == '__main__':
     parser.add_argument('--nsample', type=int)
     parser.add_argument('--proposal', type=str)
     args = parser.parse_args()
-    run_batch(nsample=args.nsample, model=args.model, nbin=args.nbin, N=args.N, proposal=args.proposal)
+    run(nsample=args.nsample, model=args.model, nbin=args.nbin, N=args.N, proposal=args.proposal)
