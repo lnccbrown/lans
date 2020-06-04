@@ -14,7 +14,7 @@ class Config(object):
 	# training dataset features
 	self.isBinned = True
 	if model is None:
-	    model = 'levy'
+	    model = 'ddm_sdv'
 	if bins != None:
 	    self.nBins = bins
 	else:
@@ -32,7 +32,9 @@ class Config(object):
 			'ddm_seq2': self.ddm_seq2_initialize,
 			'ddm_par2': self.ddm_par2_initialize,
 			'ddm_mic2': self.ddm_mic2_initialize,
-			'levy': self.levy_initialize}
+			'levy': self.levy_initialize,
+			'fullddm2': self.full_ddm2_initialize,
+			'ddm_sdv': self.ddm_sdv_initialize}
 
 	# select model
 	self.method_options[model](self.nBins)
@@ -219,3 +221,19 @@ class Config(object):
 	self.test_param_dims = [1, 1, 5, 1]
 	self.output_hist_dims = [None, 1, nbins, 2]
 	self.bounds = [(-2.5, 2.5), (0.2, 2), (0.1, 0.9), (1.0, 2.0), (0.0, 2.0)]
+
+    def full_ddm2_initialize(self, nbins):
+	self.model_name = 'full_ddm2'
+	self.dataset = 'full_ddm2_nchoices*'
+	self.param_dims = [None, 1, 7, 1]
+	self.test_param_dims = [1, 1, 7, 1]
+	self.output_hist_dims = [None, 1, nbins, 2]
+	self.bounds = [(-3, 3), (0.3, 2.0), (0.3, 0.7), (0.25, 2.5), (0.0, 0.5), (0.0, 2.0), (0.05, 0.2)]
+
+    def ddm_sdv_initialize(self, nbins):
+	self.model_name = 'ddm_sdv'
+	self.dataset = 'ddm_sdv_nchoices*'
+	self.param_dims = [None, 1, 5, 1]
+	self.test_param_dims = [1, 1, 5, 1]
+	self.output_hist_dims = [None, 1, nbins, 2]
+	self.bounds = [(-3, 3), (0.3, 2.5), (0.1, 0.9), (0.0, 2.0), (0.0, 2.5)]

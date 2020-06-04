@@ -1,7 +1,6 @@
 import config, os
 from train_detector import train_model, test_model_eval
 import argparse
-from eval_video_with_model import eval_video_with_model
 from reverse_model import train_reverse_model, test_rev_model_eval
 
 def main(train_mode=False,
@@ -13,13 +12,6 @@ def main(train_mode=False,
     :param test_video:  run the model to get predictions
     :return:
     """
-
-    """
-    means that the model has already been trained, and we want to apply this to
-    a new video and get the confidence values for the patches
-    """
-    if test_video:
-        eval_video_with_model(config.Config())
 
     """
     bypassing the model name and train/evaluate the inverse model
