@@ -370,16 +370,17 @@ def run(datafile='../data/chong/chong_full_cnn_coh.pickle', nsample=6, model=Non
     #for sample in range(1,nsample):
     for sample in [nsample]:
         # let's choose the dataset for which we'll try to get posteriors
-        my_data = pickle.load(open(datafile ,'rb'))
+        '''
+	my_data = pickle.load(open(datafile ,'rb'))
         data = my_data[1][sample]
         data_norm = data / data.sum()
+	'''
 
-	#import ipdb; ipdb.set_trace()	
-	#my_data = pickle.load(open(cfg.inference_dataset[0],'rb'))
-	##dataset_idx = np.random.randint(100)    
-	#dataset_idx = sample
-	#data_norm = my_data[1][0][dataset_idx] # index by 'sample'
-	#data = data_norm * N
+	# get the parameter recovery data
+	my_data = pickle.load(open(cfg.inference_dataset[0],'rb'))
+	dataset_idx = sample
+	data_norm = my_data[1][0][dataset_idx] # index by 'sample'
+	data = data_norm * N
 
         # get an initial point estimate
         #mu_initial, std_initial = i_sampler.getPointEstimate(data_norm)
@@ -394,7 +395,6 @@ def run(datafile='../data/chong/chong_full_cnn_coh.pickle', nsample=6, model=Non
         # annealing factor
         gamma = 64.
 
-        #import ipdb; ipdb.set_trace()
 	# nan counter
 	nan_counter = 0
 
@@ -425,7 +425,8 @@ def run(datafile='../data/chong/chong_full_cnn_coh.pickle', nsample=6, model=Non
 	    if math.isnan(norm_perplexity) and math.isnan(norm_perplexity_cur):
 		nan_counter = nan_counter + 1
 
-	    if (current_iter > 5) and (((norm_perplexity - norm_perplexity_cur)**2 < i_sampler.tol) or ( (norm_perplexity >= 0.8) and ( (norm_perplexity - norm_perplexity_cur)**2 < 1e-3) ) or (nan_counter > 8)):
+	    # convergence criterion
+	    if (gamma == 1.) and (((norm_perplexity - norm_perplexity_cur)**2 < i_sampler.tol) or ( (norm_perplexity >= 0.8) and ( (norm_perplexity - norm_perplexity_cur)**2 < 1e-3) ) or (nan_counter > 8)):
 	        break
 	    current_iter += 1
             # update annealing term
@@ -468,14 +469,13 @@ def run(datafile='../data/chong/chong_full_cnn_coh.pickle', nsample=6, model=Non
         print ('Covariance matrix: {}'.format(np.around(np.cov(posterior_samples.transpose()),decimals=6)))
         print ('Correlation matrix: {}'.format(np.around(np.corrcoef(posterior_samples.transpose()),decimals=6)))
 
-	#results = {'mu_initial': mu_initial, 'std_initial':std_initial, 'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p, 'gt_params':my_data[0][dataset_idx], 'timeToConvergence':end_time-start_time, 'norm_perplexity':norm_perplexity}
-        #results = {'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p, 'gt_params':my_data[0][dataset_idx], 'timeToConvergence':end_time-start_time, 'norm_perplexity':norm_perplexity}
-        results = {'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p, 'timeToConvergence':end_time-start_time, 'norm_perplexity':norm_perplexity}
+        results = {'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p, 'gt_params':my_data[0][dataset_idx], 'timeToConvergence':end_time-start_time, 'norm_perplexity':norm_perplexity, 'log_likelihood':log_target}
+        #results = {'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p, 'timeToConvergence':end_time-start_time, 'norm_perplexity':norm_perplexity}
 
 
 
-        pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_chong_sample_{}_model_{}.pickle'.format(sample,cfg.refname)),'wb'))
-        #pickle.dump(results, open(os.path.join(cfg.results_dir, 'benchmark_exps/IS_model_{}_N_{}_idx_{}_{}_reparam.pickle'.format(cfg.refname,N,dataset_idx,proposal)),'wb'))
+        #pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_chong_sample_{}_model_{}.pickle'.format(sample,cfg.refname)),'wb'))
+        pickle.dump(results, open(os.path.join(cfg.results_dir, 'eLIFE_exps/IS_model_{}_N_{}_idx_{}_{}.pickle'.format(cfg.refname,N,dataset_idx,proposal)),'wb'))
 
 
 if __name__ == '__main__':
