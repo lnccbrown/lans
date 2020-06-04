@@ -7,7 +7,6 @@ from reverse_model import cnn_reverse_model
 from train_detector import cnn_model_struct
 import config
 import tensorflow as tf
-#import pandas as pd
 import time
 import argparse
 import math
@@ -149,6 +148,12 @@ class ImportanceSampler:
 	if tdist:
 	    self.degrees_p = np.zeros_like(alpha_p) + 1 + np.random.randint(10)
 
+    def reparamSigmoid(self, a, b):
+        return lambda v : a + (b-a)/(1 + np.exp(-v))
+
+    def reparamInvSigmoid(self, a, b):
+        return lambda v : np.log((v - a)/(b - v))
+
     def initializeMixturesMLE(self, dataset, n_components=3, tdist=False):
 	self.target = dataset.reshape((-1,))
 	hessianfn = nd.Hessian(self.objectivefn)
@@ -162,14 +167,12 @@ class ImportanceSampler:
 	mu_p = np.zeros((n_components, n_dims))
 	std_p = np.zeros((n_components, n_dims, n_dims))
 
-        #import ipdb; ipdb.set_trace()
 	print('Initializing proposal distributions...')
 	for c in tqdm.tqdm(range(n_components)):
 	    output = differential_evolution(self.objectivefn, self.cfg.bounds)
-	    mu_p[c,:] = output.x
-	    H = hessianfn(output.x)
-	    #std_p[c,:,:] = np.multiply(np.linalg.inv(H), np.eye(H.shape[0])) 
-	    std_p[c,:,:] = H
+	    #mu_p[c,:] = [self.reparamInvSigmoid(self.cfg.bounds[idx][0], self.cfg.bounds[idx][1])(y) for idx,y in enumerate(output.x)]
+            mu_p[c,:] = output.x
+            std_p[c, :, :] = np.eye(std_p[c,:,:].shape[0]) * 0.5
 
 	# set the members
         self.n_components = n_components
@@ -188,8 +191,8 @@ class ImportanceSampler:
     def likelihood(self, x, y, gamma, eps=1e-7):
 	return np.sum(np.log(x+eps)*y/gamma, axis=1)
 
-    def MLELikelihood(self, x, y, gamma=8, eps=1e-7):
-        return np.sum(-np.log(x+eps)*y/gamma)
+    def MLELikelihood(self, x, y, eps=1e-7):
+        return np.sum(-np.log(x+eps)*y)
 
     '''
     feed forward through the inverse model to get a point estimate of the parameters that could've generated a given dataset
@@ -203,6 +206,13 @@ class ImportanceSampler:
     def getLikelihoodFromProposals(self, params, target, gamma):
 	nbatches = params.shape[0] / self.inf_batch_size
 	L = []
+
+        #import ipdb; ipdb.set_trace()
+        # transforming back to original parameter space
+        #params_dummy = np.zeros_like(params)
+        #for k in range(params.shape[1]):
+        #    params_dummy[:,k] = self.reparamSigmoid(self.cfg.bounds[k][0], self.cfg.bounds[k][1])(params[:,k])
+
 	for batch in range(nbatches):
 	    params_cur = np.expand_dims(np.expand_dims(params[batch*self.inf_batch_size : (batch+1)*self.inf_batch_size, :],-1),1)
 	    pred_data = self.forward_sess.run(self.forward_model.output, feed_dict={self.forward_input:params_cur})
@@ -237,6 +247,7 @@ class ImportanceSampler:
 	            iter_samples = cur_samps
 	        else:
                     iter_samples = np.concatenate([iter_samples, cur_samps], axis=0)
+            
 	    idx = self.getOOBIndices(iter_samples)
 	    iter_samples = iter_samples[idx[0],:]
 	    if cur_iter == 0:
@@ -269,7 +280,8 @@ class ImportanceSampler:
 	            iter_samples = cur_samps
 	        else:
                     iter_samples = np.concatenate([iter_samples, cur_samps], axis=0)
-	    idx = self.getOOBIndices(iter_samples)
+	    
+            idx = self.getOOBIndices(iter_samples)
 	    iter_samples = iter_samples[idx[0],:]
 	    if cur_iter == 0:
 	        samples = iter_samples
@@ -345,7 +357,7 @@ def plotMarginals(posterior_samples, params, filename):
     plt.savefig(filename)
     plt.show()    
 
-def run(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=None, nbin=None, N=None, proposal=None):
+def run(datafile='../data/chong/chong_full_cnn_coh.pickle', nsample=6, model=None, nbin=None, N=None, proposal=None):
     # load in the configurations
     cfg = config.Config(model=model, bins=nbin, N=N)
     #datafile = cfg.inference_dataset
@@ -358,38 +370,37 @@ def run(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=None, n
     #for sample in range(1,nsample):
     for sample in [nsample]:
         # let's choose the dataset for which we'll try to get posteriors
-        #my_data = pickle.load(open(datafile ,'rb'))
-        #data = my_data[0][sample]
-        #data_norm = data / data.sum()
+        my_data = pickle.load(open(datafile ,'rb'))
+        data = my_data[1][sample]
+        data_norm = data / data.sum()
 
 	#import ipdb; ipdb.set_trace()	
-	my_data = pickle.load(open(cfg.inference_dataset[0],'rb'))
-	#dataset_idx = np.random.randint(100)    
-	dataset_idx = sample
-	data_norm = my_data[1][0][dataset_idx] # index by 'sample'
-	data = data_norm * N
+	#my_data = pickle.load(open(cfg.inference_dataset[0],'rb'))
+	##dataset_idx = np.random.randint(100)    
+	#dataset_idx = sample
+	#data_norm = my_data[1][0][dataset_idx] # index by 'sample'
+	#data = data_norm * N
 
         # get an initial point estimate
         #mu_initial, std_initial = i_sampler.getPointEstimate(data_norm)
  
         # Initializing the mixture
         #i_sampler.initializeMixtures(mu_initial, std_initial, n_components=12, mu_perturbation=(-.5, .5), spread=10., tdist=tdist)
-	i_sampler.initializeMixturesMLE(data, n_components=12, tdist=tdist)
+	i_sampler.initializeMixturesMLE(data, n_components=24, tdist=tdist)
 
         # convergence metric
         norm_perplexity, cur_iter = -1.0, 0.
 
         # annealing factor
-        gamma = 8. #64.
+        gamma = 64.
 
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
 	# nan counter
 	nan_counter = 0
 
         start_time = time.time()
 	current_iter = 0
         while (cur_iter < i_sampler.max_iters):
-
 	    # sample parameters from the proposal distribution
 	    X = i_sampler.generateFromProposal()
 	    # evaluate the likelihood of observering these parameters
@@ -451,16 +462,20 @@ def run(datafile='../data/bg_stn/bg_stn_binned.pickle', nsample=6, model=None, n
 
         end_time = time.time()
         print('Time elapsed: {}'.format(end_time - start_time))
-        print('Predicted variances from the reverse model: {}'.format(std_initial))
+        #print('Predicted variances from the reverse model: {}'.format(std_initial))
         post_idx = np.random.choice(w.shape[0], p=w, replace=True, size = 100000)
         posterior_samples = X[post_idx, :]
         print ('Covariance matrix: {}'.format(np.around(np.cov(posterior_samples.transpose()),decimals=6)))
         print ('Correlation matrix: {}'.format(np.around(np.corrcoef(posterior_samples.transpose()),decimals=6)))
 
-	results = {'mu_initial': mu_initial, 'std_initial':std_initial, 'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p, 'gt_params':my_data[0][dataset_idx], 'timeToConvergence':end_time-start_time, 'norm_perplexity':norm_perplexity}
+	#results = {'mu_initial': mu_initial, 'std_initial':std_initial, 'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p, 'gt_params':my_data[0][dataset_idx], 'timeToConvergence':end_time-start_time, 'norm_perplexity':norm_perplexity}
+        #results = {'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p, 'gt_params':my_data[0][dataset_idx], 'timeToConvergence':end_time-start_time, 'norm_perplexity':norm_perplexity}
+        results = {'final_x':X, 'final_w':w, 'posterior_samples':posterior_samples, 'alpha':i_sampler.alpha_p, 'mu':i_sampler.mu_p, 'cov':i_sampler.std_p, 'timeToConvergence':end_time-start_time, 'norm_perplexity':norm_perplexity}
 
-        #pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_bg_stn_sample_{}_model_{}.pickle'.format(sample,cfg.refname)),'wb'))
-        pickle.dump(results, open(os.path.join(cfg.results_dir, 'benchmark_exps/IS_model_{}_N_{}_idx_{}_{}.pickle'.format(cfg.refname,N,dataset_idx,proposal)),'wb'))
+
+
+        pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_chong_sample_{}_model_{}.pickle'.format(sample,cfg.refname)),'wb'))
+        #pickle.dump(results, open(os.path.join(cfg.results_dir, 'benchmark_exps/IS_model_{}_N_{}_idx_{}_{}_reparam.pickle'.format(cfg.refname,N,dataset_idx,proposal)),'wb'))
 
 
 if __name__ == '__main__':
