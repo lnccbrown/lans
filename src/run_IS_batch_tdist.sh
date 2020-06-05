@@ -7,8 +7,8 @@
 #CUDA_VISIBLE_DEVICES=3,3 python importance_sampler.py --model race_model_4 --nbin 256 --N 1024
 #CUDA_VISIBLE_DEVICES=3,2 python importance_sampler.py --model lca_3 --nbin 256 --N 1024
 
-model='fullddm'
-for sample in {0..4}
+model='angle'
+for sample in {500..1000}
 do
-CUDA_VISIBLE_DEVICES=2 python sampler_inference.py --model $model --nsample $sample --nbin 256 --N 1024 --proposal tdist
+CUDA_VISIBLE_DEVICES=0 python sampler_inference.py --model $model --nsample $sample --nbin 512 --N 4096 --proposal tdist
 done

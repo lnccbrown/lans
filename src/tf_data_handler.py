@@ -21,7 +21,7 @@ def write_tfrecord(
         tf_record_dir,
         tf_filename))
     for i in tqdm.tqdm(range(len(images))):
-	feature = {'label': _bytes_feature(labels[i].tostring()),
+        feature = {'label': _bytes_feature(labels[i].tostring()),
                    'image': _bytes_feature(images[i].tostring())}
         example = tf.train.Example(features=tf.train.Features(feature=feature))
         writer.write(example.SerializeToString())

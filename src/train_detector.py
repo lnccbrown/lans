@@ -31,22 +31,22 @@ class cnn_model_struct:
         return np.prod([int(x) for x in input_data.get_shape()[1:]])
 
     def build(self, input_data, input_shape, output_shape, train_mode=None, verbose=True):
-	if verbose:
+        if verbose:
             print ("Building the network...")
         network_input = tf.identity(input_data, name='input')
         with tf.name_scope('reshape'):
             x_data = tf.reshape(network_input, [-1, input_shape[0], input_shape[1], input_shape[2]])
         self.upsample1 = self.fc_layer(x_data, self.get_size(x_data), 16, 'upsample1')
-	if verbose:
+        if verbose:
             print(self.upsample1.get_shape())
         self.upsample2 = self.fc_layer(self.upsample1, self.get_size(self.upsample1), 64, 'upsample2')
-	if verbose:
+        if verbose:
             print(self.upsample2.get_shape())
         self.upsample3 = self.fc_layer(self.upsample2, self.get_size(self.upsample2), 256, 'upsample3')
-	if verbose:
+        if verbose:
             print(self.upsample3.get_shape())
         self.upsample4 = self.fc_layer(self.upsample3, self.get_size(self.upsample3), 1024, 'upsample4')
-	if verbose:
+        if verbose:
             print(self.upsample4.get_shape())
 
         self.upsample4 = tf.expand_dims(tf.expand_dims(self.upsample4,1),-1)
@@ -57,7 +57,7 @@ class cnn_model_struct:
             self.b_conv1 = self.bias_variable([8],var_name='bconv1')
             self.norm1 = tf.layers.batch_normalization(self.conv2d(self.upsample4, self.W_conv1,stride=[1,2,2,1]) + self.b_conv1,scale=True,center=True,training=train_mode)
             self.h_conv1 = tf.nn.leaky_relu(self.norm1, alpha=0.1)
-	if verbose:
+        if verbose:
             print(self.h_conv1.get_shape())
 
         # conv layer 2
@@ -66,7 +66,7 @@ class cnn_model_struct:
             self.b_conv2 = self.bias_variable([4],var_name='bconv2')
             self.norm2 = tf.layers.batch_normalization(self.conv2d(self.h_conv1, self.W_conv2, stride=[1, 1, 1, 1]) + self.b_conv2,scale=True,center=True,training=train_mode)
             self.h_conv2 = tf.nn.leaky_relu(self.norm2, alpha=0.1)
-	if verbose:
+        if verbose:
             print(self.h_conv2.get_shape())
 
         # conv layer 3
@@ -75,13 +75,13 @@ class cnn_model_struct:
             self.b_conv3 = self.bias_variable([2],var_name='bconv3')
             self.norm3 = tf.layers.batch_normalization(self.conv2d(self.h_conv2, self.W_conv3, stride=[1, 1, 1, 1]) + self.b_conv3, scale=True,center=True,training=train_mode)
             self.h_conv3 = tf.nn.leaky_relu(self.norm3,alpha=0.1)
-	if verbose:
+        if verbose:
             print(self.h_conv3.get_shape())
 
         self.final_layer = self.fc_layer(self.h_conv3, self.get_size(self.h_conv3), np.prod(output_shape), 'final_layer')
         self.final_layer = tf.nn.softmax(self.final_layer)
         self.output = tf.identity(self.final_layer,name='output')
-	if verbose:
+        if verbose:
             print(self.output.get_shape())
 
     def conv2d(self, x, W, stride=[1,1,1,1]):
@@ -146,7 +146,7 @@ class cnn_model_struct:
                 var = tf.get_variable(name=var_name, initializer=value)
         else:
             var = tf.constant(value, dtype=tf.float32, name=var_name)
-	    #var = tf.get_variable(name=var_name, initializer=value)
+            #var = tf.get_variable(name=var_name, initializer=value)
 
         self.var_dict[(name, idx)] = var
 
@@ -166,27 +166,27 @@ def kl_divergence_test(p, q, eps1=1e-7, eps2=1e-30):
 def train_model(config):
 
     train_files = os.path.join(
-			config.base_dir,
-			config.tfrecord_dir,
-			config.train_tfrecords)
+                        config.base_dir,
+                        config.tfrecord_dir,
+                        config.train_tfrecords)
     val_files = os.path.join(
-			config.base_dir,
-			config.tfrecord_dir,
-			config.val_tfrecords)
+                        config.base_dir,
+                        config.tfrecord_dir,
+                        config.val_tfrecords)
 
     with tf.device('/cpu:0'): 
-	train_data, train_labels = inputs(
-					tfrecord_file=train_files,
-					num_epochs=config.epochs,
-					batch_size=config.train_batch,
-					target_data_dims=config.param_dims,
-					target_label_dims=config.output_hist_dims)
-	val_data, val_labels = inputs(
-					tfrecord_file=val_files,
-					num_epochs=config.epochs,
-					batch_size=config.val_batch,
-					target_data_dims=config.param_dims,
-					target_label_dims=config.output_hist_dims)
+        train_data, train_labels = inputs(
+                                        tfrecord_file=train_files,
+                                        num_epochs=config.epochs,
+                                        batch_size=config.train_batch,
+                                        target_data_dims=config.param_dims,
+                                        target_label_dims=config.output_hist_dims)
+        val_data, val_labels = inputs(
+                                        tfrecord_file=val_files,
+                                        num_epochs=config.epochs,
+                                        batch_size=config.val_batch,
+                                        target_data_dims=config.param_dims,
+                                        target_label_dims=config.output_hist_dims)
 
     with tf.device('/gpu:0'):
         with tf.variable_scope("model") as scope:
@@ -212,21 +212,21 @@ def train_model(config):
             #     lab_shaped = tf.reshape(train_labels, [config.train_batch, config.num_classes])
             # accuracy = calc_error(lab_shaped, res_shaped)
 
-	    #####
-	    ## VALIDATION
-	    #####
+            #####
+            ## VALIDATION
+            #####
             print("building a validation model")
             #with tf.variable_scope('val_model', reuse=tf.AUTO_REUSE):
-	    scope.reuse_variables()
+            scope.reuse_variables()
             val_model = cnn_model_struct()
             val_model.build(val_data, config.param_dims[1:], config.output_hist_dims[1:],train_mode=False)
             val_res = val_model.output
             val_loss =  kl_divergence(val_res, tf.reshape(val_labels, [-1,np.prod(config.output_hist_dims[1:])]))
 
-	    #img = tf.expand_dims(tf.reshape(train_labels,[-1,32,16]),axis=-1)
+            #img = tf.expand_dims(tf.reshape(train_labels,[-1,32,16]),axis=-1)
             tf.summary.scalar("loss", kl_divergence_loss)
-	    #tf.summary.image("groundtruth", img)
-	    #tf.summary.histogram("predictions",y_conv)
+            #tf.summary.image("groundtruth", img)
+            #tf.summary.histogram("predictions",y_conv)
             #tf.summary.scalar("train error", accuracy)
             #tf.summary.scalar("validation error", val_error)
             summary_op = tf.summary.merge_all()
@@ -248,14 +248,14 @@ def train_model(config):
         threads = tf.train.start_queue_runners(coord=coord)
 
         step = 0
-	start = time.time()
+        start = time.time()
         try:
             while not coord.should_stop():
                 # train for a step
                 _, loss, softmax_outputs, tr_data, tr_labels = sess.run([train_step, kl_divergence_loss, y_conv, train_data, train_labels])
                 step+=1
-		if math.isnan(loss):
-			import ipdb; ipdb.set_trace()
+                if math.isnan(loss):
+                        import ipdb; ipdb.set_trace()
                 #import ipdb; ipdb.set_trace()
                 '''
                 # validating the model. main concern is if the weights are shared between
@@ -270,32 +270,32 @@ def train_model(config):
                 # save the model check point
                 '''
                 if step % config.print_iters == 0:
-		    finish = time.time()
+                    finish = time.time()
                     print("step={}, loss={}, time_elapsed={} s/step".format(step,loss,(finish-start)/float(config.print_iters)))
-		    start = finish
+                    start = finish
                     saver.save(sess,os.path.join(
                         config.model_output,
                         config.model_name+'_'+str(step)+'.ckpt'
                     ),global_step=step)
 
-		if step % config.val_iters == 0:
-		    val_forward_pass_time = time.time()
-		    v_data, v_labels, v_res, v_loss = sess.run([val_data, val_labels, val_res, val_loss])
+                if step % config.val_iters == 0:
+                    val_forward_pass_time = time.time()
+                    v_data, v_labels, v_res, v_loss = sess.run([val_data, val_labels, val_res, val_loss])
 
-		    summary_str = sess.run(summary_op)
-		    train_writer.add_summary(summary_str, step)
-		    print("\t val loss = {}, time_elapsed = {}s".format(v_loss, time.time() - val_forward_pass_time))
-		    
-		    for kk in range(1):
-			X = v_res[kk].reshape(-1,config.output_hist_dims[-1]); 
-			plt.plot(X,color='r',alpha=0.5, label='Predictions'); 
-			plt.plot(v_labels[kk],'g',alpha=0.5, label='Data');
-			plt.legend() 
-			#plt.plot(X[:,1],color='b',alpha=0.5); 
-			#plt.plot(v_labels[kk][:,1],'-.b',alpha=0.5); 
-			plt.pause(1);
-			plt.clf()
-		    
+                    summary_str = sess.run(summary_op)
+                    train_writer.add_summary(summary_str, step)
+                    print("\t val loss = {}, time_elapsed = {}s".format(v_loss, time.time() - val_forward_pass_time))
+                    
+                    for kk in range(1):
+                        X = v_res[kk].reshape(-1,config.output_hist_dims[-1]); 
+                        plt.plot(X,color='r',alpha=0.5, label='Predictions'); 
+                        plt.plot(v_labels[kk],'g',alpha=0.5, label='Data');
+                        plt.legend() 
+                        #plt.plot(X[:,1],color='b',alpha=0.5); 
+                        #plt.plot(v_labels[kk][:,1],'-.b',alpha=0.5); 
+                        plt.pause(1);
+                        plt.clf()
+                    
         except tf.errors.OutOfRangeError:
             print("Finished training for %d epochs" % config.epochs)
         finally:
@@ -304,20 +304,20 @@ def train_model(config):
 
 def test_model_eval(config):
     test_files = os.path.join(
-			config.base_dir,
-			config.tfrecord_dir,
-			config.test_tfrecords)
+                        config.base_dir,
+                        config.tfrecord_dir,
+                        config.test_tfrecords)
 
     errors = []
     data, labels, preds = [], [], []
 
     with tf.device('/cpu:0'): 
-	test_data, test_labels = inputs(
-					tfrecord_file=test_files,
-					num_epochs=1,
-					batch_size=config.test_batch,
-					target_data_dims=config.param_dims,
-					target_label_dims=config.output_hist_dims)
+        test_data, test_labels = inputs(
+                                        tfrecord_file=test_files,
+                                        num_epochs=1,
+                                        batch_size=config.test_batch,
+                                        target_data_dims=config.param_dims,
+                                        target_label_dims=config.output_hist_dims)
     with tf.device('/gpu:0'):
         with tf.variable_scope("model") as scope:
             model = cnn_model_struct()
@@ -342,12 +342,12 @@ def test_model_eval(config):
                     ckpts=tf.train.latest_checkpoint(config.model_output)
                     saver.restore(sess,ckpts)
                     ip , op, pred, err = sess.run([test_data, test_labels, y_conv, error])
-		    batch_err = np.sum(err, axis=1)
-		    errors.append(batch_err)
-		    data.append(ip)
-		    labels.append(op)
-		    preds.append(pred)
-		    print('{} batches complete..'.format(len(errors)))
+                    batch_err = np.sum(err, axis=1)
+                    errors.append(batch_err)
+                    data.append(ip)
+                    labels.append(op)
+                    preds.append(pred)
+                    print('{} batches complete..'.format(len(errors)))
             except tf.errors.OutOfRangeError:
                 print('Epoch limit reached!')
             finally:
@@ -375,14 +375,14 @@ def test_model_eval(config):
     # lets draw a 3x3 grid with
     fig, ax = plt.subplots(3,3)
     for k in range(9):
-	r, c = int(k/3), k%3
-	cur_idx = idx[-1 * (k+1)]
-	parameters = np.around(inp_data[cur_idx].flatten(),decimals=2)
-	err = err_vals[cur_idx]
-	ax[r,c].plot(inp_labs[cur_idx],'r',alpha=0.5)
-	ax[r,c].plot(net_preds[cur_idx],'-.g',alpha=0.5)
+        r, c = int(k/3), k%3
+        cur_idx = idx[-1 * (k+1)]
+        parameters = np.around(inp_data[cur_idx].flatten(),decimals=2)
+        err = err_vals[cur_idx]
+        ax[r,c].plot(inp_labs[cur_idx],'r',alpha=0.5)
+        ax[r,c].plot(net_preds[cur_idx],'-.g',alpha=0.5)
         mystr = 'err=%0.2f'%(err)
-	ax[r,c].text(0.9,.9, "\n".join(wrap('{}, params:{}'.format(mystr, parameters),30)), fontsize=6, horizontalalignment='right', verticalalignment='center', transform=ax[r,c].transAxes)
+        ax[r,c].text(0.9,.9, "\n".join(wrap('{}, params:{}'.format(mystr, parameters),30)), fontsize=6, horizontalalignment='right', verticalalignment='center', transform=ax[r,c].transAxes)
         #plt.show() 
         ax[r,c].tick_params(axis='both', which='major', labelsize=6)
         ax[r,c].tick_params(axis='both', which='minor', labelsize=6)
