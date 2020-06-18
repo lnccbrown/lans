@@ -487,6 +487,7 @@ def run(datafile='../data/chong/chong_full_cnn_coh.pickle', nsample=6, model=Non
         for _ in tqdm.tqdm(workers.imap(model_inference, tuples), total=n_components):
             rec_params.append(_)
             pass
+        workers.close()
         i_sampler.initializeMixturesMLEV2(rec_params, n_components=n_components, tdist=tdist)
         init_end_time = time.time()
 
@@ -596,7 +597,7 @@ def run(datafile='../data/chong/chong_full_cnn_coh.pickle', nsample=6, model=Non
 
 
         #pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_chong_sample_{}_model_{}.pickle'.format(sample,cfg.refname)),'wb'))
-        f =  gzip.open(os.path.join(cfg.results_dir, 'eLIFE_exps/IS_model_{}_N_{}_idx_{}_{}.pklz'.format(cfg.refname,N,dataset_idx,proposal)),'wb')
+        f =  gzip.open(os.path.join(cfg.results_dir, 'time_benchmark_eLIFE_exps/IS_model_{}_N_{}_idx_{}_{}.pklz'.format(cfg.refname,N,dataset_idx,proposal)),'wb')
         pickle.dump(results,f)
         f.close()
 
