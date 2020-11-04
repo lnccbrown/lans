@@ -1,0 +1,36 @@
+model_params:
+    input_shape: 0 # specified when training data loaded
+    output_shape: 0 # specified when training data loaded
+    output_activation: 'linear'
+    hidden_layers: [20, 40, 60, 80, 100, 120]
+    hidden_activations: ['relu', 'relu', 'relu', 'relu', 'relu', 'relu']
+    l1_activation: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    l2_activation: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    l1_kernel: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    l2_kernel: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    optimizer: 'Nadam'
+    loss: 'mse'
+    metrics: ['mse']
+train_params:
+    callback_funs: ['ReduceLROnPlateau', 'EarlyStopping', 'ModelCheckpoint']
+    plateau_patience: 10
+    min_delta: 0.000001  # Minimum improvement in evaluation metric that counts as learning
+    early_stopping_patience: 15
+    callback_monitor: 'loss'
+    min_learning_rate: 0.0000001
+    red_coef_learning_rate: 0.1
+    ckpt_period: 10
+    ckpt_save_best_only: True
+    ckpt_save_weights_only: True
+    max_train_epochs: 250
+    batch_size: 1000000
+    warm_start: False
+    checkpoint: 'ckpt'
+    model_cnt: 0  # This is important for saving result files coherently, a global cnt of models run 
+data_params:
+   model_directory: '/media/data_cifs/afengler/data/kde/ddm/keras_models'
+   checkpoint: 'ckpt'
+   model_name: 'mlp'
+   data_type_signature: '_ddm_kde_'
+   timestamp: '..' # specified automatically upon initializing class
+   training_data_size: 0 # specified when training data loaded
