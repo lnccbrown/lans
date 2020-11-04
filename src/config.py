@@ -6,7 +6,7 @@ class Config(object):
 
     def __init__(self, model=None, bins=None, N=None):
         # Directory setup
-        self.base_dir = '/media/data_cifs/lakshmi/projectABC/'
+        self.base_dir = '/media/data_cifs/projects/prj_approx-bayes/projectABC/'
         self.data_dir = 'data'
         self.tfrecord_dir = 'tfrecords'
         self.summary_dir = 'summaries'
@@ -60,7 +60,7 @@ class Config(object):
         self.model_suffix = 'full_cov' if self.full_cov_matrix else 'isotropic'
 
         # Data configuration
-        self.results_dir = '/media/data_cifs/lakshmi/projectABC/results/'
+        self.results_dir = '/media/data_cifs/projects/prj_approx-bayes/projectABC/results/'
         self.model_output = os.path.join(self.base_dir,
                                         'models',
                                         self.refname)
@@ -94,7 +94,8 @@ class Config(object):
         self.param_dims = [None, 1, 4, 1]
         self.test_param_dims = [1, 1, 4, 1]
         self.output_hist_dims = [None, 1, nbins, 2]
-        self.bounds = [(-2.5, 2.5), (0.2, 2), (0.1, 0.9), (0.0, 2.0)]
+        self.bounds = [(-2.5, 2.5), (0.5, 2.2), (0.25, 0.75), (0.05, 1.95)]
+    	self.param_names = ['v', 'a', 'w', 'ndt']
 
     def weibull_initialize(self, nbins):
         self.model_name = 'weibull'

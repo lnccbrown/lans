@@ -288,10 +288,16 @@ class ImportanceSampler:
         #params_dummy = np.zeros_like(params)
         #for k in range(params.shape[1]):
         #    params_dummy[:,k] = self.reparamSigmoid(self.cfg.bounds[k][0], self.cfg.bounds[k][1])(params[:,k])
+	
+
+	#import time
 
         for batch in range(nbatches):
             params_cur = np.expand_dims(np.expand_dims(params[batch*self.inf_batch_size : (batch+1)*self.inf_batch_size, :],-1),1)
+            #st = time.time()
             pred_data = self.forward_sess.run(self.forward_model.output, feed_dict={self.forward_input:params_cur})
+            #et = time.time()
+            #print(et-st)
             likelihoods = self.likelihood(pred_data, target.reshape((-1,)), gamma)
             L.extend(likelihoods)
         return np.array(L)
@@ -444,7 +450,7 @@ def model_inference(args):
     return output.x
 
 def run(datafile='../data/chong/chong_full_cnn_coh.pickle', nsample=6, model=None, nbin=None, N=None, proposal=None, n_components=24):
-    
+
     # set up the parallel pool for MLE initialization
     n_workers = 8
     workers = Pool(n_workers)
@@ -597,7 +603,7 @@ def run(datafile='../data/chong/chong_full_cnn_coh.pickle', nsample=6, model=Non
 
 
         #pickle.dump(results, open(os.path.join(cfg.results_dir, 'results_chong_sample_{}_model_{}.pickle'.format(sample,cfg.refname)),'wb'))
-        f =  gzip.open(os.path.join(cfg.results_dir, 'time_benchmark_eLIFE_exps/IS_model_{}_N_{}_idx_{}_{}.pklz'.format(cfg.refname,N,dataset_idx,proposal)),'wb')
+        f =  gzip.open(os.path.join(cfg.results_dir, 'time_benchmark_eLIFE_exps_round2/IS_model_{}_N_{}_idx_{}_{}.pklz'.format(cfg.refname,N,dataset_idx,proposal)),'wb')
         pickle.dump(results,f)
         f.close()
 
