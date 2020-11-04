@@ -5,3 +5,5 @@ summaries/*
 results/*
 *.pyc
 *.swp
+*.png
+*.pdf
