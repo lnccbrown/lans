@@ -352,25 +352,6 @@ class data_generator():
                             '_n_' + str(self.config['nsamples']) + \
                             '.pickle'
 
-#             else:
-#                 training_data_folder = self.config['method_folder'] + \
-#                                       'training_data_binned_' + \
-#                                       str(int(self.config['binned'])) + \
-#                                       '_nbins_' + str(self.config['nbins']) + \
-#                                       '_n_' + str(self.config['nsamples'])
-                
-#                 if not os.path.exists(training_data_folder):
-#                     os.makedirs(training_data_folder)
-
-#                 full_file_name = training_data_folder + '/' + \
-#                                 self.config['method'] + \
-#                                 '_nchoices_' + str(self.config['nchoices']) + \
-#                                 '_train_data_binned_' + \
-#                                 str(int(self.config['binned'])) + \
-#                                 '_nbins_' + str(self.config['nbins']) + \
-#                                 '_n_' + str(self.config['nsamples']) + \
-#                                 '_' + self.config['file_id'] + '.pickle'
-            
             print('Writing to file: ', full_file_name)
             
             pickle.dump((np.float32(np.stack(theta_list)), 
