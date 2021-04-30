@@ -239,21 +239,6 @@ def simulator(theta,
                 delta_t = delta_t,
                 n_samples = n_samples,
                 max_t = max_t)
-        
-#         race_model(v = np.array([0, 0, 0], dtype = DTYPE), # np.array expected, one column of floats
-#                float a = 1, # initial boundary separation
-#                w = np.array([0, 0, 0], dtype = DTYPE), # np.array expected, one column of floats
-#                float ndt = 1, # for now we we don't allow ndt by choice
-#                #ndt = np.array([0.0, 0.0, 0.0], dtype = DTYPE),
-#                s = np.array([1, 1, 1], dtype = DTYPE), # np.array expected, one column of floats
-#                float delta_t = 0.001, # time increment step
-#                float max_t = 20, # maximum rt allowed
-#                int n_samples = 2000, 
-#                print_info = True,
-#                boundary_fun = None,
-#                boundary_multiplicative = True,
-#                boundary_params = {})       
-#     if model == 'race_model_4':
     
     if bin_dim == 0:
         return x

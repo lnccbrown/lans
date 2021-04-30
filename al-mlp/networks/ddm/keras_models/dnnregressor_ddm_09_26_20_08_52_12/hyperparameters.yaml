@@ -1,0 +1,12 @@
+hidden_layers: [100, 100, 120, 1] #[200, 120, 100, 1] # [100, 100, 120, 1] # [100, 100, 100, 100, 1]   #
+hidden_activations: ["tanh", "tanh", "tanh", "linear"] # ["tanh", "tanh", "tanh", "tanh", "linear"]
+filters: [128, 128, 128, 128]
+batch_size: 100000
+n_epochs: 50 # CHANGE AGAINs
+learning_rate: .002 # I think was originally 0.0002
+momentum: .7
+model_type: "dnnregressor"
+optimizer: "adam"
+log: True
+loss: "huber"
+gpu_x7: '2'
