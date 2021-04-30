@@ -1,7 +1,7 @@
 # projectABC
 This repository houses code for training deep neural networks to approximate the likelihood function of a family of Sequential Sampling Models. We provide two separate strategies for this: the pointwise and the dataset approach. More details regarding the ideas behind this work can be found at https://elifesciences.org/articles/65074
 
-# al-mlpL The pointwise approach
+# al-mlp: The pointwise approach
 Provides implementation for the "pointwise" approach. 
 
 # al-cnn: The dataset approach
